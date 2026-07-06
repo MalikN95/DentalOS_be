@@ -1,0 +1,30 @@
+# dependencies
+/node_modules
+
+# build
+/dist
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# tests
+/coverage
+/.nyc_output
+
+# IDE
+/.idea
+/.vscode
+*.launch
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,6 @@
+# из корня D:\work\dentalOS
+docker compose up -d      # запустить
+docker compose ps         # статус
+docker compose logs -f postgres
+docker compose down       # остановить (данные сохранятся)
+docker compose down -v    # остановить и стереть данные

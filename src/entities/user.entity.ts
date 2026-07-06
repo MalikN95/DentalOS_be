@@ -1,0 +1,48 @@
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { UserRole } from '../common/enums/user-role.enum';
+import { BaseEntity } from './base.entity';
+import { ClinicEntity } from './clinic.entity';
+
+@Entity('users')
+@Index(['clinicId', 'email'], { unique: true })
+export class UserEntity extends BaseEntity {
+  @Column('uuid')
+  clinicId: string;
+
+  @ManyToOne(() => ClinicEntity, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'clinicId' })
+  clinic: ClinicEntity;
+
+  @Column()
+  email: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  phone: string | null;
+
+  // Nullable: social/SMS-provisioned accounts have no local password
+  @Column({ type: 'varchar', nullable: true, select: false })
+  passwordHash: string | null;
+
+  @Column({ default: false })
+  mfaEnabled: boolean;
+
+  // Base32 TOTP secret (RFC 6238)
+  @Column({ type: 'varchar', nullable: true, select: false })
+  mfaSecret: string | null;
+
+  @Column()
+  firstName: string;
+
+  @Column()
+  lastName: string;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.RECEPTIONIST })
+  role: UserRole;
+
+  // Id of the current refresh token (rotation); null = logged out
+  @Column({ type: 'varchar', nullable: true, select: false })
+  refreshJti: string | null;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
