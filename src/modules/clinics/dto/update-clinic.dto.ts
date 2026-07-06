@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsObject,
@@ -64,4 +65,9 @@ export class UpdateClinicDto {
   @IsOptional()
   @IsString()
   logoKey?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

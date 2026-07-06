@@ -34,7 +34,9 @@ export class ClinicsService {
     clinicId: string,
     dto: UpdateClinicDto,
   ): Promise<ClinicResponse> {
-    const clinic = await this.findById(clinicId);
+    const clinic = await this.clinicsRepository.findOne({
+      where: { id: clinicId },
+    });
 
     if (!clinic) {
       throw new NotFoundException('Clinic not found');

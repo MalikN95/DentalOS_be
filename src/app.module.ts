@@ -6,13 +6,31 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { envValidationSchema } from './config/env.validation';
 import { buildTypeOrmOptions } from './config/typeorm.config';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAccessGuard } from './modules/auth/guards/jwt-access.guard';
+import { BookingModule } from './modules/booking/booking.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { CabinetsModule } from './modules/cabinets/cabinets.module';
 import { ClinicsModule } from './modules/clinics/clinics.module';
 import { TenantMiddleware } from './modules/clinics/tenant.middleware';
+import { CrmModule } from './modules/crm/crm.module';
+import { DentalChartModule } from './modules/dental-chart/dental-chart.module';
+import { DoctorsModule } from './modules/doctors/doctors.module';
+import { EquipmentModule } from './modules/equipment/equipment.module';
 import { EventsModule } from './modules/events/events.module';
+import { FinanceModule } from './modules/finance/finance.module';
 import { HealthModule } from './modules/health/health.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
+import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PatientsModule } from './modules/patients/patients.module';
+import { RemindersModule } from './modules/reminders/reminders.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { SchedulesModule } from './modules/schedules/schedules.module';
+import { ServicesModule } from './modules/services/services.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -26,6 +44,7 @@ import { UsersModule } from './modules/users/users.module';
       inject: [ConfigService],
       useFactory: buildTypeOrmOptions,
     }),
+    NotificationsModule,
     StorageModule,
     EventsModule,
     AuditModule,
@@ -33,6 +52,23 @@ import { UsersModule } from './modules/users/users.module';
     ClinicsModule,
     UsersModule,
     AuthModule,
+    BranchesModule,
+    CabinetsModule,
+    DoctorsModule,
+    ServicesModule,
+    PatientsModule,
+    AppointmentsModule,
+    SchedulesModule,
+    BookingModule,
+    MedicalRecordsModule,
+    DentalChartModule,
+    FinanceModule,
+    MarketingModule,
+    CrmModule,
+    AnalyticsModule,
+    ReviewsModule,
+    RemindersModule,
+    EquipmentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAccessGuard },

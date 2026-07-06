@@ -36,7 +36,10 @@ cp .env.example .env
 # 3. Run migrations
 npm run migration:run
 
-# 4. Start
+# 4. Seed default clinic + admin user
+npm run seed
+
+# 5. Start
 npm run start:dev
 ```
 
@@ -64,6 +67,7 @@ In production migrations run automatically at startup (`migrationsRun: true`).
 | `npm run migration:generate -- src/database/migrations/Init` | Generate migration from entity diff |
 | `npm run migration:run` | Apply migrations |
 | `npm run migration:revert` | Revert last migration |
+| `npm run seed` | Seed default clinic + admin user (idempotent) |
 
 ## Project structure
 

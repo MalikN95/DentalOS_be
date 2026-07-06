@@ -10,10 +10,7 @@ const bootstrap = async (): Promise<void> => {
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
-  app.enableCors({
-    origin: config.getOrThrow<string>('CORS_ORIGIN'),
-    credentials: true,
-  });
+  app.enableCors();
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({
@@ -35,7 +32,13 @@ const bootstrap = async (): Promise<void> => {
     jsonDocumentUrl: 'api/docs-json',
   });
 
-  await app.listen(config.getOrThrow<number>('PORT'));
+  await app
+    .listen(config.getOrThrow<number>('PORT'))
+    .then(() =>
+      console.info(
+        `Server is running on port ${config.getOrThrow<number>('PORT')}, listen on http://localhost:${config.getOrThrow<number>('PORT')}`,
+      ),
+    );
 };
 
 void bootstrap();
