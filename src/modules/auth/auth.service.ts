@@ -8,7 +8,11 @@ import {
   JwtRefreshPayload,
 } from '../../common/types/jwt-payload.type';
 import { UsersService } from '../users/users.service';
+import { LoginResponseDto } from './dto/login-response.dto';
 import { TokensDto } from './dto/tokens.dto';
+import { MfaPendingPayload } from './types/auth-token-payload.type';
+
+const MFA_TOKEN_TTL = '5m';
 
 @Injectable()
 export class AuthService {
@@ -22,13 +26,13 @@ export class AuthService {
     clinicId: string,
     email: string,
     password: string,
-  ): Promise<TokensDto> {
+  ): Promise<LoginResponseDto> {
     const user = await this.usersService.findByEmailWithPassword(
       clinicId,
       email,
     );
 
-    if (!user) {
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -38,11 +42,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.issueTokens({
+    const payload: JwtPayload = {
       sub: user.id,
       clinicId: user.clinicId,
       role: user.role,
-    });
+    };
+
+    if (user.mfaEnabled) {
+      return this.buildMfaChallenge(payload);
+    }
+
+    return this.issueTokens(payload);
   }
 
   async refresh(refreshToken: string): Promise<TokensDto> {
@@ -69,7 +79,8 @@ export class AuthService {
     await this.usersService.updateRefreshJti(userId, null);
   }
 
-  private async issueTokens(payload: JwtPayload): Promise<TokensDto> {
+  // Second step (MFA / SMS / social) also ends here, hence public
+  async issueTokens(payload: JwtPayload): Promise<TokensDto> {
     const jti = randomUUID();
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -96,6 +107,20 @@ export class AuthService {
     await this.usersService.updateRefreshJti(payload.sub, jti);
 
     return { accessToken, refreshToken };
+  }
+
+  // mfa: 'pending' tokens are rejected by the access strategy — they only
+  // work at POST /auth/mfa/verify
+  async buildMfaChallenge(payload: JwtPayload): Promise<LoginResponseDto> {
+    const mfaToken = await this.jwtService.signAsync(
+      { ...payload, mfa: 'pending' } satisfies MfaPendingPayload,
+      {
+        secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
+        expiresIn: MFA_TOKEN_TTL,
+      },
+    );
+
+    return { mfaRequired: true, mfaToken };
   }
 
   private async verifyRefreshToken(token: string): Promise<JwtRefreshPayload> {

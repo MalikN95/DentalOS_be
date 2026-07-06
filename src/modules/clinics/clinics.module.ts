@@ -4,6 +4,7 @@ import { BranchEntity } from '../../entities/branch.entity';
 import { CabinetEntity } from '../../entities/cabinet.entity';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { EquipmentEntity } from '../../entities/equipment.entity';
+import { ClinicsController } from './clinics.controller';
 import { ClinicsService } from './clinics.service';
 import { TenantMiddleware } from './tenant.middleware';
 
@@ -16,6 +17,7 @@ import { TenantMiddleware } from './tenant.middleware';
       EquipmentEntity,
     ]),
   ],
+  controllers: [ClinicsController],
   providers: [ClinicsService, TenantMiddleware],
   exports: [TypeOrmModule, ClinicsService],
 })

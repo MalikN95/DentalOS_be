@@ -8,7 +8,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { WorkingHours } from '../../../common/types/working-hours.type';
+import type { WorkingHours } from '../../../common/types/working-hours.type';
 
 export class CreateBranchDto {
   @ApiProperty({ example: 'Main Branch' })

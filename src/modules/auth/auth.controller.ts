@@ -6,6 +6,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { TokensDto } from './dto/tokens.dto';
 
@@ -17,11 +18,11 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ type: TokensDto })
+  @ApiOkResponse({ type: LoginResponseDto })
   login(
     @CurrentClinic() clinic: ClinicEntity,
     @Body() dto: LoginDto,
-  ): Promise<TokensDto> {
+  ): Promise<LoginResponseDto> {
     return this.authService.login(clinic.id, dto.email, dto.password);
   }
 

@@ -66,4 +66,19 @@ export default tseslint.config(
       'import-x/no-cycle': 'off',
     },
   },
+  {
+    // RFC 6238 TOTP requires bitwise ops and byte iteration
+    files: ['src/modules/auth/totp.util.ts'],
+    rules: {
+      'no-bitwise': 'off',
+      'no-restricted-syntax': 'off',
+    },
+  },
+  {
+    // global fetch/Response are stable in Node 20+, but eslint-plugin-n flags them until v21
+    files: ['src/modules/auth/id-token.verifier.ts'],
+    rules: {
+      'n/no-unsupported-features/node-builtins': 'off',
+    },
+  },
 );

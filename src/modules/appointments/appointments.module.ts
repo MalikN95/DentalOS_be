@@ -1,0 +1,29 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppointmentEntity } from '../../entities/appointment.entity';
+import { BranchEntity } from '../../entities/branch.entity';
+import { CabinetEntity } from '../../entities/cabinet.entity';
+import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
+import { PatientEntity } from '../../entities/patient.entity';
+import { ReminderEntity } from '../../entities/reminder.entity';
+import { ServiceEntity } from '../../entities/service.entity';
+import { AppointmentsController } from './appointments.controller';
+import { AppointmentsService } from './appointments.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      AppointmentEntity,
+      PatientEntity,
+      DoctorProfileEntity,
+      ServiceEntity,
+      BranchEntity,
+      CabinetEntity,
+      ReminderEntity,
+    ]),
+  ],
+  controllers: [AppointmentsController],
+  providers: [AppointmentsService],
+  exports: [AppointmentsService],
+})
+export class AppointmentsModule {}

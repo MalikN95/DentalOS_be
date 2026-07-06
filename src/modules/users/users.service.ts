@@ -1,7 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { UserEntity } from '../../entities/user.entity';
+
+export interface CreateUserData {
+  clinicId: string;
+  email: string;
+  phone?: string | null;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  passwordHash?: string | null;
+}
+
+export interface MfaPatch {
+  mfaEnabled?: boolean;
+  mfaSecret?: string | null;
+}
 
 @Injectable()
 export class UsersService {
@@ -25,6 +41,47 @@ export class UsersService {
 
   findById(id: string): Promise<UserEntity | null> {
     return this.usersRepository.findOne({ where: { id, isActive: true } });
+  }
+
+  findByEmail(clinicId: string, email: string): Promise<UserEntity | null> {
+    return this.usersRepository.findOne({
+      where: { clinicId, email, isActive: true },
+    });
+  }
+
+  findByPhone(clinicId: string, phone: string): Promise<UserEntity | null> {
+    return this.usersRepository.findOne({
+      where: { clinicId, phone, isActive: true },
+    });
+  }
+
+  createUser(data: CreateUserData): Promise<UserEntity> {
+    const user = this.usersRepository.create({
+      clinicId: data.clinicId,
+      email: data.email,
+      phone: data.phone ?? null,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: data.role,
+      passwordHash: data.passwordHash ?? null,
+    });
+
+    return this.usersRepository.save(user);
+  }
+
+  async findMfaSecret(userId: string): Promise<string | null> {
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.mfaSecret')
+      .where('user.id = :userId', { userId })
+      .andWhere('user.isActive = true')
+      .getOne();
+
+    return user?.mfaSecret ?? null;
+  }
+
+  async updateMfa(userId: string, patch: MfaPatch): Promise<void> {
+    await this.usersRepository.update({ id: userId }, patch);
   }
 
   async updateRefreshJti(userId: string, jti: string | null): Promise<void> {
