@@ -1,6 +1,7 @@
 import { dataSource } from '../data-source';
 import { getSeedConfig } from './seed.config';
 import { seedAdminUser } from './seed-admin';
+import { seedBranches } from './seed-branches';
 import { seedPatients } from './seed-patients';
 import { seedStaff } from './seed-staff';
 
@@ -13,6 +14,7 @@ const runSeed = async (): Promise<void> => {
 
   try {
     await seedAdminUser(dataSource);
+    await seedBranches(dataSource);
     await seedStaff(dataSource);
     await seedPatients(dataSource);
     // eslint-disable-next-line no-console -- seed CLI output

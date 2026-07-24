@@ -68,15 +68,17 @@ In production migrations run automatically at startup (`migrationsRun: true`).
 | `npm run migration:generate -- src/database/migrations/Init` | Generate migration from entity diff |
 | `npm run migration:run` | Apply migrations |
 | `npm run migration:revert` | Revert last migration |
-| `npm run seed` | Seed default clinic + admin, staff (owner/doctors/receptionist/assistant) and patients (idempotent) |
+| `npm run seed` | Seed default clinic + admin, branches, staff (owner/admin/4 doctors/2 receptionists/assistant/accountant/1 inactive) and patients (idempotent) |
 
 ## Seeding
 
-`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/` (`seed-clinic`, `seed-admin`, `seed-staff`, `seed-patients`). All seeders are idempotent — reruns never duplicate rows.
+`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/` (`seed-clinic`, `seed-admin`, `seed-branches`, `seed-staff`, `seed-patients`). All seeders are idempotent — reruns never duplicate rows.
 
 The same seeders run automatically on application boot when `SEED_ON_START=true` (see `SeedModule` → `SeedService.onApplicationBootstrap`). Handy for a fresh Docker/dev database.
 
 Credentials and demo data are configured via `SEED_*` env vars (see `.env.example`): admin (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`), staff (`SEED_STAFF_PASSWORD`, e.g. `owner@maximum.local`, `ivanov@maximum.local`), and 4 sample patients.
+
+`seed-branches` creates two branches (`Центральный`, `Филиал на Ленинском`) with working hours; `seed-staff` attaches the seeded doctor profiles to them by branch name and backfills the branch on profiles that were seeded before branches existed.
 
 ## Project structure
 
@@ -89,6 +91,7 @@ src/
   modules/
     auth/         # login, refresh (rotation), logout
     users/        # users per clinic
+    staff/        # employees CRUD (/api/staff) incl. the doctor profile
     clinics/      # clinic settings, branches, cabinets, equipment
     audit/        # audit log (global)
     events/       # WebSocket gateway (global)
@@ -112,6 +115,26 @@ src/
 4. `POST /api/auth/logout` revokes the refresh token
 
 All routes are protected by default (global guard); public routes are marked with `@Public()`. Role checks via `@Roles(UserRole.DOCTOR)`.
+
+## Staff API (`/api/staff`)
+
+Clinic employees = clinic users whose role is one of `owner | admin | doctor | receptionist | assistant | accountant` (`STAFF_ROLES`); patients and platform super-admins are never listed.
+
+| Method | Route | Roles | Notes |
+| --- | --- | --- | --- |
+| `GET` | `/api/staff` | any authenticated | Paginated (`page`, `limit`), `search` (name/email/phone, ILIKE), `role`, `isActive` |
+| `GET` | `/api/staff/:id` | any authenticated | |
+| `POST` | `/api/staff` | owner, admin | Creates the user with a bcrypt password; a `doctor` block creates the doctor profile |
+| `PATCH` | `/api/staff/:id` | owner, admin | Every field optional; an omitted `password` keeps the current credentials |
+| `DELETE` | `/api/staff/:id` | owner, admin | Soft-deletes the user and their doctor profile |
+
+Behaviour worth knowing:
+
+- The `doctor` block (branch, specializations, education, experience, description) is applied only when the role is `doctor`. Changing a doctor's role to anything else soft-deletes the doctor profile; changing it back re-creates (or restores) it.
+- `branchId` is validated against the clinic; `null` detaches the doctor from any branch.
+- The `(clinicId, email)` unique index also covers soft-deleted rows, so creating an employee with the email of a removed one **restores** that record instead of failing.
+- Guards: you cannot delete your own account, and the clinic always keeps at least one active owner (blocks deleting, deactivating or demoting the last one).
+- `passwordHash`, `mfaSecret` and `refreshJti` are `select: false` and never leave the API; updates use an explicit column patch so they are not clobbered.
 
 ## Linting
 
