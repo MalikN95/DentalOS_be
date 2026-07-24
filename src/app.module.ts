@@ -30,6 +30,7 @@ import { PatientsModule } from './modules/patients/patients.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
+import { SeedModule } from './modules/seed/seed.module';
 import { ServicesModule } from './modules/services/services.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
@@ -69,6 +70,7 @@ import { UsersModule } from './modules/users/users.module';
     ReviewsModule,
     RemindersModule,
     EquipmentModule,
+    SeedModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAccessGuard },

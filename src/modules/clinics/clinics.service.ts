@@ -42,7 +42,13 @@ export class ClinicsService {
       throw new NotFoundException('Clinic not found');
     }
 
-    Object.assign(clinic, dto);
+    // Only apply provided fields. With `useDefineForClassFields`, the DTO
+    // instance carries every optional field as `undefined`, so a blind
+    // Object.assign would wipe untouched columns (e.g. logoKey, name).
+    const definedFields = Object.fromEntries(
+      Object.entries(dto).filter(([, value]) => value !== undefined),
+    );
+    Object.assign(clinic, definedFields);
     const saved = await this.clinicsRepository.save(clinic);
 
     return this.withLogoUrl(saved);

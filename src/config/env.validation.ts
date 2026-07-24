@@ -26,4 +26,7 @@ export const envValidationSchema = Joi.object({
   S3_SECRET_KEY: Joi.string().required(),
   S3_BUCKET: Joi.string().required(),
   S3_FORCE_PATH_STYLE: Joi.boolean().default(true),
+
+  // When true, SeedModule seeds clinic/admin/staff/patients on app start
+  SEED_ON_START: Joi.boolean().default(false),
 });

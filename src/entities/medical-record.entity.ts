@@ -29,11 +29,23 @@ export class MedicalRecordEntity extends BaseEntity {
   @JoinColumn({ name: 'appointmentId' })
   appointment: AppointmentEntity | null;
 
+  @Column({ type: 'text', nullable: true })
+  complaints: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  examination: string | null;
+
   @Column({ type: 'text' })
   diagnosis: string;
 
   @Column({ type: 'text', nullable: true })
   treatment: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  prescriptions: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  recommendations: string | null;
 
   @Column({ type: 'text', nullable: true })
   notes: string | null;

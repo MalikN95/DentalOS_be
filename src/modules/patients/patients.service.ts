@@ -99,6 +99,7 @@ export class PatientsService {
         doctorProfile: { user: true },
         service: true,
         branch: true,
+        cabinet: true,
       },
       order: { startsAt: 'DESC' },
       skip: (page - 1) * limit,

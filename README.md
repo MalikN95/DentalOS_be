@@ -36,8 +36,9 @@ cp .env.example .env
 # 3. Run migrations
 npm run migration:run
 
-# 4. Seed default clinic + admin user
+# 4. Seed default clinic + admin, staff and patients
 npm run seed
+# (or set SEED_ON_START=true in .env to seed automatically on every app start)
 
 # 5. Start
 npm run start:dev
@@ -67,7 +68,15 @@ In production migrations run automatically at startup (`migrationsRun: true`).
 | `npm run migration:generate -- src/database/migrations/Init` | Generate migration from entity diff |
 | `npm run migration:run` | Apply migrations |
 | `npm run migration:revert` | Revert last migration |
-| `npm run seed` | Seed default clinic + admin user (idempotent) |
+| `npm run seed` | Seed default clinic + admin, staff (owner/doctors/receptionist/assistant) and patients (idempotent) |
+
+## Seeding
+
+`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/` (`seed-clinic`, `seed-admin`, `seed-staff`, `seed-patients`). All seeders are idempotent — reruns never duplicate rows.
+
+The same seeders run automatically on application boot when `SEED_ON_START=true` (see `SeedModule` → `SeedService.onApplicationBootstrap`). Handy for a fresh Docker/dev database.
+
+Credentials and demo data are configured via `SEED_*` env vars (see `.env.example`): admin (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`), staff (`SEED_STAFF_PASSWORD`, e.g. `owner@maximum.local`, `ivanov@maximum.local`), and 4 sample patients.
 
 ## Project structure
 

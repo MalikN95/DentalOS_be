@@ -79,8 +79,12 @@ export class MedicalRecordsService {
       patientId: dto.patientId,
       doctorProfileId,
       appointmentId: dto.appointmentId ?? null,
+      complaints: dto.complaints ?? null,
+      examination: dto.examination ?? null,
       diagnosis: dto.diagnosis,
       treatment: dto.treatment ?? null,
+      prescriptions: dto.prescriptions ?? null,
+      recommendations: dto.recommendations ?? null,
       notes: dto.notes ?? null,
     });
 
@@ -96,11 +100,23 @@ export class MedicalRecordsService {
   ): Promise<MedicalRecordEntity> {
     const record = await this.findOne(clinicId, id);
 
+    if (dto.complaints !== undefined) {
+      record.complaints = dto.complaints;
+    }
+    if (dto.examination !== undefined) {
+      record.examination = dto.examination;
+    }
     if (dto.diagnosis !== undefined) {
       record.diagnosis = dto.diagnosis;
     }
     if (dto.treatment !== undefined) {
       record.treatment = dto.treatment;
+    }
+    if (dto.prescriptions !== undefined) {
+      record.prescriptions = dto.prescriptions;
+    }
+    if (dto.recommendations !== undefined) {
+      record.recommendations = dto.recommendations;
     }
     if (dto.notes !== undefined) {
       record.notes = dto.notes;

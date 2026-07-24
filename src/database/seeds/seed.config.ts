@@ -5,6 +5,7 @@ export interface SeedConfig {
   adminPassword: string;
   adminFirstName: string;
   adminLastName: string;
+  staffPassword: string;
 }
 
 export const getSeedConfig = (): SeedConfig => ({
@@ -14,4 +15,5 @@ export const getSeedConfig = (): SeedConfig => ({
   adminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'Admin12345',
   adminFirstName: process.env.SEED_ADMIN_FIRST_NAME ?? 'Admin',
   adminLastName: process.env.SEED_ADMIN_LAST_NAME ?? 'User',
+  staffPassword: process.env.SEED_STAFF_PASSWORD ?? 'Staff12345',
 });
