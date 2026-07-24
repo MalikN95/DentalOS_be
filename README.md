@@ -142,4 +142,4 @@ ESLint 9 (flat config) with Airbnb style guide via `eslint-config-airbnb-extende
 
 ## Pre-commit
 
-Husky + lint-staged (ESLint + Prettier on staged files) + commitlint (conventional commits).
+Husky runs `npm run build` (`nest build`) on `pre-commit` — that is the only check. ESLint, Prettier and the commit-message format are **not** enforced on commit; run `npm run lint` / `npm run format` manually. There is no `commit-msg` hook (commitlint was removed), so commit messages are free-form.
