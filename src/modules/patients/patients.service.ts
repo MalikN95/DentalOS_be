@@ -22,7 +22,7 @@ export class PatientsService {
     clinicId: string,
     query: ListPatientsQueryDto,
   ): Promise<PaginatedResult<PatientEntity>> {
-    const { page, limit, search, isActive } = query;
+    const { page, limit, search, isActive, createdFrom, createdTo } = query;
 
     const qb = this.patientsRepository
       .createQueryBuilder('patient')
@@ -30,6 +30,14 @@ export class PatientsService {
 
     if (isActive !== undefined) {
       qb.andWhere('patient.isActive = :isActive', { isActive });
+    }
+
+    if (createdFrom) {
+      qb.andWhere('patient.createdAt >= :createdFrom', { createdFrom });
+    }
+
+    if (createdTo) {
+      qb.andWhere('patient.createdAt <= :createdTo', { createdTo });
     }
 
     if (search) {

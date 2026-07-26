@@ -81,4 +81,15 @@ export default tseslint.config(
       'n/no-unsupported-features/node-builtins': 'off',
     },
   },
+  {
+    // Demo data generators: day/doctor slot cursors and sequential invoice
+    // numbering are naturally imperative and must await writes one at a time
+    // to stay race-free.
+    files: ['src/database/seeds/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+      'no-continue': 'off',
+      'no-await-in-loop': 'off',
+    },
+  },
 );

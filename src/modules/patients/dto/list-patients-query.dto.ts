@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 export class ListPatientsQueryDto extends PaginationQueryDto {
@@ -20,4 +20,14 @@ export class ListPatientsQueryDto extends PaginationQueryDto {
   })
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Registered on/after this ISO date' })
+  @IsOptional()
+  @IsDateString()
+  createdFrom?: string;
+
+  @ApiPropertyOptional({ description: 'Registered on/before this ISO date' })
+  @IsOptional()
+  @IsDateString()
+  createdTo?: string;
 }

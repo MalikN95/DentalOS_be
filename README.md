@@ -68,17 +68,21 @@ In production migrations run automatically at startup (`migrationsRun: true`).
 | `npm run migration:generate -- src/database/migrations/Init` | Generate migration from entity diff |
 | `npm run migration:run` | Apply migrations |
 | `npm run migration:revert` | Revert last migration |
-| `npm run seed` | Seed default clinic + admin, branches, staff (owner/admin/4 doctors/2 receptionists/assistant/accountant/1 inactive) and patients (idempotent) |
+| `npm run seed` | Seed clinic, admin, branches, staff, patients, services, cabinets, appointments, invoices/payments and leads (idempotent) |
 
 ## Seeding
 
-`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/` (`seed-clinic`, `seed-admin`, `seed-branches`, `seed-staff`, `seed-patients`). All seeders are idempotent — reruns never duplicate rows.
+`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/`, run in order: `seed-clinic` → `seed-admin` → `seed-branches` → `seed-staff` → `seed-patients` → `seed-random-patients` → `seed-services` → `seed-cabinets` → `seed-appointments` → `seed-invoices` → `seed-leads`. All seeders are idempotent — reruns never duplicate rows.
 
 The same seeders run automatically on application boot when `SEED_ON_START=true` (see `SeedModule` → `SeedService.onApplicationBootstrap`). Handy for a fresh Docker/dev database.
 
-Credentials and demo data are configured via `SEED_*` env vars (see `.env.example`): admin (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`), staff (`SEED_STAFF_PASSWORD`, e.g. `owner@maximum.local`, `ivanov@maximum.local`), and 4 sample patients.
+Credentials and demo data are configured via `SEED_*` env vars (see `.env.example`): admin (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`), staff (`SEED_STAFF_PASSWORD`, e.g. `owner@maximum.local`, `ivanov@maximum.local`), and sample patients.
 
 `seed-branches` creates two branches (`Центральный`, `Филиал на Ленинском`) with working hours; `seed-staff` attaches the seeded doctor profiles to them by branch name and backfills the branch on profiles that were seeded before branches existed.
+
+`seed-random-patients` adds ~24 backdated patients (on top of the 4 curated ones from `seed-patients`) so patient volume and "new patients" stats look real. `seed-services`/`seed-cabinets` create demo service categories, services and per-branch cabinets. `seed-appointments` generates a random spread of appointments (past 14 days, today, next 6 days) across every active doctor, patient, service and cabinet, with statuses picked realistically for the day/time (today's slot always gets appointments even if it lands on a Sunday, so the appointments screen is never empty). `seed-invoices` creates a paid invoice + payment (and occasionally a refund) for every completed appointment, so the `/analytics/revenue` endpoint has real numbers. `seed-leads` creates a spread of CRM leads across funnel stages for `/analytics/conversion`.
+
+Coarse idempotency note: `seed-appointments`/`seed-leads` skip entirely if the clinic already has any rows, so re-running the seed weeks later won't refresh "today" — truncate `appointments`/`invoices`/`payments`/`refunds`/`leads` first if you need a fresh spread.
 
 ## Project structure
 
