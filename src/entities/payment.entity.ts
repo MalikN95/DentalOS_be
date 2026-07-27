@@ -11,7 +11,6 @@ export enum PaymentMethod {
   GIFT_CERTIFICATE = 'gift_certificate',
   MEMBERSHIP = 'membership',
 }
-
 @Entity('payments')
 @Index(['invoiceId'])
 export class PaymentEntity extends BaseEntity {

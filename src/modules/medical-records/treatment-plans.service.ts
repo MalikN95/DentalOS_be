@@ -1,6 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import {
+  Between,
+  DataSource,
+  FindOptionsWhere,
+  In,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { PatientEntity } from '../../entities/patient.entity';
@@ -37,15 +45,42 @@ export class TreatmentPlansService {
     clinicId: string,
     query: ListTreatmentPlansQueryDto,
   ): Promise<PaginatedResult<TreatmentPlanEntity>> {
-    await assertPatientInClinic(
-      this.patientRepository,
-      query.patientId,
-      clinicId,
-    );
+    if (query.patientId) {
+      await assertPatientInClinic(
+        this.patientRepository,
+        query.patientId,
+        clinicId,
+      );
+    }
+
+    // Clinic scoping goes through the patient relation: TreatmentPlanEntity
+    // has no clinicId column of its own.
+    const where: FindOptionsWhere<TreatmentPlanEntity> = {
+      patient: { clinicId },
+    };
+
+    if (query.patientId) {
+      where.patientId = query.patientId;
+    }
+
+    if (query.createdFrom && query.createdTo) {
+      where.createdAt = Between(
+        new Date(query.createdFrom),
+        new Date(query.createdTo),
+      );
+    } else if (query.createdFrom) {
+      where.createdAt = MoreThanOrEqual(new Date(query.createdFrom));
+    } else if (query.createdTo) {
+      where.createdAt = LessThanOrEqual(new Date(query.createdTo));
+    }
 
     const [items, total] = await this.planRepository.findAndCount({
-      where: { patientId: query.patientId },
-      relations: { items: { service: true }, doctorProfile: { user: true } },
+      where,
+      relations: {
+        patient: true,
+        items: { service: true },
+        doctorProfile: { user: true },
+      },
       order: { createdAt: 'DESC', items: { sortOrder: 'ASC' } },
       skip: (query.page - 1) * query.limit,
       take: query.limit,

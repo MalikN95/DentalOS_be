@@ -10,6 +10,7 @@ export enum ToothCondition {
   EXTRACTED = 'extracted',
   IMPLANT = 'implant',
   CROWN = 'crown',
+  OTHER = 'other',
 }
 
 // Interactive dental chart: current state = latest mark per tooth,

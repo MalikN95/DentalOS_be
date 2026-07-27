@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -11,6 +12,7 @@ import {
   Min,
 } from 'class-validator';
 import { PatientFileType } from '../../../entities/patient-file.entity';
+import { VALID_TOOTH_NUMBERS } from '../../dental-chart/constants/tooth-numbers.constant';
 
 export class CreatePatientFileDto {
   @ApiProperty({
@@ -47,4 +49,15 @@ export class CreatePatientFileDto {
   @IsOptional()
   @IsUUID()
   medicalRecordId?: string;
+
+  @ApiPropertyOptional({
+    example: 36,
+    description: 'FDI tooth number (11-18, 21-28, 31-38, 41-48)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn(VALID_TOOTH_NUMBERS, {
+    message: 'toothNumber must be a valid FDI tooth number',
+  })
+  toothNumber?: number;
 }

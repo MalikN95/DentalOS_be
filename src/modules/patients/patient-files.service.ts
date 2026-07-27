@@ -37,9 +37,13 @@ export class PatientFilesService {
   ): Promise<PaginatedResult<PatientFileWithUrl>> {
     await this.ensurePatient(clinicId, patientId);
 
-    const { page, limit, type } = query;
+    const { page, limit, type, toothNumber } = query;
     const [files, total] = await this.filesRepository.findAndCount({
-      where: { patientId, ...(type ? { type } : {}) },
+      where: {
+        patientId,
+        ...(type ? { type } : {}),
+        ...(toothNumber !== undefined ? { toothNumber } : {}),
+      },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -99,6 +103,7 @@ export class PatientFilesService {
       patientId,
       medicalRecordId: dto.medicalRecordId ?? null,
       type: dto.type,
+      toothNumber: dto.toothNumber ?? null,
       fileKey: dto.key,
       fileName: dto.fileName,
       mimeType: dto.mimeType,

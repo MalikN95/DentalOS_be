@@ -1,9 +1,21 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsDateString, IsOptional, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 export class ListTreatmentPlansQueryDto extends PaginationQueryDto {
-  @ApiProperty({ format: 'uuid' })
+  // Omit to list plans across the whole clinic
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  patientId: string;
+  patientId?: string;
+
+  @ApiPropertyOptional({ description: 'Created on/after this ISO date' })
+  @IsOptional()
+  @IsDateString()
+  createdFrom?: string;
+
+  @ApiPropertyOptional({ description: 'Created on/before this ISO date' })
+  @IsOptional()
+  @IsDateString()
+  createdTo?: string;
 }

@@ -33,6 +33,10 @@ export class PatientFileEntity extends BaseEntity {
   @Column({ type: 'enum', enum: PatientFileType })
   type: PatientFileType;
 
+  // Optional link to a specific tooth (FDI notation), e.g. an X-ray of tooth 36
+  @Column('int', { nullable: true })
+  toothNumber: number | null;
+
   // S3 object key, download via presigned URL
   @Column()
   fileKey: string;
