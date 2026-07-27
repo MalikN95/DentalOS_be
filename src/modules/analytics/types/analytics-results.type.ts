@@ -1,7 +1,13 @@
 import { LeadStage } from '../../../entities/lead.entity';
+import { PaymentMethod } from '../../../entities/payment.entity';
 
 export interface RevenueByDayItem {
   date: string;
+  amount: number;
+}
+
+export interface RevenueByMethodItem {
+  method: PaymentMethod;
   amount: number;
 }
 
@@ -10,6 +16,7 @@ export interface RevenueAnalytics {
   totalRefunded: number;
   net: number;
   byDay: RevenueByDayItem[];
+  byMethod: RevenueByMethodItem[];
 }
 
 export interface DoctorLoadItem {

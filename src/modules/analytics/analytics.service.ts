@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { LeadEntity, LeadStage } from '../../entities/lead.entity';
-import { PaymentEntity } from '../../entities/payment.entity';
+import { PaymentEntity, PaymentMethod } from '../../entities/payment.entity';
 import { RefundEntity } from '../../entities/refund.entity';
 import { PeriodQueryDto } from './dto/period-query.dto';
 import {
@@ -75,6 +75,17 @@ export class AnalyticsService {
       .orderBy("TO_CHAR(payment.createdAt, 'YYYY-MM-DD')", 'ASC')
       .getRawMany<{ date: string; amount: string }>();
 
+    const byMethodRows = await this.paymentsRepository
+      .createQueryBuilder('payment')
+      .innerJoin('payment.invoice', 'invoice')
+      .select('payment.method', 'method')
+      .addSelect('SUM(payment.amount)', 'amount')
+      .where('invoice.clinicId = :clinicId', { clinicId })
+      .andWhere('payment.createdAt BETWEEN :from AND :to', { from, to })
+      .groupBy('payment.method')
+      .orderBy('SUM(payment.amount)', 'DESC')
+      .getRawMany<{ method: PaymentMethod; amount: string }>();
+
     const totalPaid = Number(paidRow?.total ?? 0);
     const totalRefunded = Number(refundedRow?.total ?? 0);
 
@@ -84,6 +95,10 @@ export class AnalyticsService {
       net: this.round(totalPaid - totalRefunded),
       byDay: byDayRows.map((row) => ({
         date: row.date,
+        amount: Number(row.amount),
+      })),
+      byMethod: byMethodRows.map((row) => ({
+        method: row.method,
         amount: Number(row.amount),
       })),
     };
