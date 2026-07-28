@@ -7,7 +7,7 @@ import {
 
 /**
  * Placeholder transport: logs instead of sending.
- * Replace with a real provider (Twilio, SMTP, FCM, Bot API, ...) per channel
+ * Replace with a real provider (Twilio, FCM, Bot API, ...) per channel
  * by implementing NotificationSender and registering it in NotificationsModule.
  */
 export class LogSender implements NotificationSender {
@@ -23,6 +23,3 @@ export class LogSender implements NotificationSender {
     return Promise.resolve();
   }
 }
-
-export const createLogSenders = (): NotificationSender[] =>
-  Object.values(NotificationChannel).map((channel) => new LogSender(channel));

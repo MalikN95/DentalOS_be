@@ -19,6 +19,8 @@ import { TenantMiddleware } from './modules/clinics/tenant.middleware';
 import { CrmModule } from './modules/crm/crm.module';
 import { DentalChartModule } from './modules/dental-chart/dental-chart.module';
 import { DoctorsModule } from './modules/doctors/doctors.module';
+import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
+import { EmailsModule } from './modules/emails/emails.module';
 import { EquipmentModule } from './modules/equipment/equipment.module';
 import { EventsModule } from './modules/events/events.module';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -62,6 +64,8 @@ import { UsersModule } from './modules/users/users.module';
     ServicesModule,
     PatientsModule,
     PatientTagsModule,
+    EmailTemplatesModule,
+    EmailsModule,
     AppointmentsModule,
     SchedulesModule,
     BookingModule,

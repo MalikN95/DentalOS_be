@@ -9,6 +9,15 @@ export enum PatientFileType {
   DOCUMENT = 'document',
 }
 
+export enum PatientDocumentType {
+  CONTRACT = 'contract',
+  CONSENT = 'consent',
+  CERTIFICATE = 'certificate',
+  ID = 'id',
+  INSURANCE = 'insurance',
+  OTHER = 'other',
+}
+
 @Entity('patient_files')
 @Index(['patientId'])
 export class PatientFileEntity extends BaseEntity {
@@ -32,6 +41,13 @@ export class PatientFileEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: PatientFileType })
   type: PatientFileType;
+
+  // Only meaningful when type === DOCUMENT
+  @Column({ type: 'enum', enum: PatientDocumentType, nullable: true })
+  documentType: PatientDocumentType | null;
+
+  @Column({ type: 'text', nullable: true })
+  note: string | null;
 
   // Optional link to a specific tooth (FDI notation), e.g. an X-ray of tooth 36
   @Column('int', { nullable: true })

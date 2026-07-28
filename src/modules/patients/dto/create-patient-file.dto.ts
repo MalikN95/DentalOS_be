@@ -11,7 +11,10 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { PatientFileType } from '../../../entities/patient-file.entity';
+import {
+  PatientDocumentType,
+  PatientFileType,
+} from '../../../entities/patient-file.entity';
 import { VALID_TOOTH_NUMBERS } from '../../dental-chart/constants/tooth-numbers.constant';
 
 export class CreatePatientFileDto {
@@ -44,6 +47,20 @@ export class CreatePatientFileDto {
   @ApiProperty({ enum: PatientFileType })
   @IsEnum(PatientFileType)
   type: PatientFileType;
+
+  @ApiPropertyOptional({
+    enum: PatientDocumentType,
+    description: 'Only meaningful when type is "document"',
+  })
+  @IsOptional()
+  @IsEnum(PatientDocumentType)
+  documentType?: PatientDocumentType;
+
+  @ApiPropertyOptional({ example: 'Signed on the first visit' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()

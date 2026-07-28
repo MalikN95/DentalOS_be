@@ -103,6 +103,8 @@ export class PatientFilesService {
       patientId,
       medicalRecordId: dto.medicalRecordId ?? null,
       type: dto.type,
+      documentType: dto.documentType ?? null,
+      note: dto.note ?? null,
       toothNumber: dto.toothNumber ?? null,
       fileKey: dto.key,
       fileName: dto.fileName,

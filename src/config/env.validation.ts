@@ -29,4 +29,12 @@ export const envValidationSchema = Joi.object({
 
   // When true, SeedModule seeds clinic/admin/staff/patients on app start
   SEED_ON_START: Joi.boolean().default(false),
+
+  SMTP_HOST: Joi.string().hostname().required(),
+  SMTP_PORT: Joi.number().port().default(587),
+  SMTP_SECURE: Joi.boolean().default(false),
+  SMTP_USER: Joi.string().required(),
+  SMTP_PASSWORD: Joi.string().required(),
+  SMTP_FROM_EMAIL: Joi.string().email().required(),
+  SMTP_FROM_NAME: Joi.string().default('DentalOS'),
 });
