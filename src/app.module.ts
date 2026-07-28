@@ -26,6 +26,7 @@ import { HealthModule } from './modules/health/health.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PatientTagsModule } from './modules/patient-tags/patient-tags.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
@@ -60,6 +61,7 @@ import { UsersModule } from './modules/users/users.module';
     DoctorsModule,
     ServicesModule,
     PatientsModule,
+    PatientTagsModule,
     AppointmentsModule,
     SchedulesModule,
     BookingModule,

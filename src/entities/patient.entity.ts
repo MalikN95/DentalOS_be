@@ -1,7 +1,8 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, JoinTable, ManyToMany, ManyToOne } from 'typeorm';
 import { Gender } from '../common/enums/gender.enum';
 import { BaseEntity } from './base.entity';
 import { ClinicEntity } from './clinic.entity';
+import { PatientTagEntity } from './patient-tag.entity';
 import { UserEntity } from './user.entity';
 
 export interface PatientInsurance {
@@ -61,4 +62,12 @@ export class PatientEntity extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @ManyToMany(() => PatientTagEntity)
+  @JoinTable({
+    name: 'patient_tag_assignments',
+    joinColumn: { name: 'patientId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
+  })
+  tags: PatientTagEntity[];
 }

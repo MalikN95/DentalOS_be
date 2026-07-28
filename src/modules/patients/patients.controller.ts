@@ -148,6 +148,28 @@ export class PatientsController {
     return this.patientFilesService.remove(clinic.id, fileId);
   }
 
+  @Post(':id/tags/:tagId')
+  @Roles(...WRITE_ROLES)
+  @ApiOkResponse({ type: PatientEntity })
+  addTag(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ): Promise<PatientEntity> {
+    return this.patientsService.addTag(clinic.id, id, tagId);
+  }
+
+  @Delete(':id/tags/:tagId')
+  @Roles(...WRITE_ROLES)
+  @ApiOkResponse({ type: PatientEntity })
+  removeTag(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ): Promise<PatientEntity> {
+    return this.patientsService.removeTag(clinic.id, id, tagId);
+  }
+
   @Delete(':id')
   @Roles(...WRITE_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
