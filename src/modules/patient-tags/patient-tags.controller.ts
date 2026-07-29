@@ -20,7 +20,11 @@ import { CreatePatientTagDto } from './dto/create-patient-tag.dto';
 import { UpdatePatientTagDto } from './dto/update-patient-tag.dto';
 import { PatientTagsService } from './patient-tags.service';
 
-const WRITE_ROLES = [UserRole.OWNER, UserRole.ADMIN, UserRole.RECEPTIONIST] as const;
+const WRITE_ROLES = [
+  UserRole.OWNER,
+  UserRole.ADMIN,
+  UserRole.RECEPTIONIST,
+] as const;
 
 @ApiTags('patient-tags')
 @ApiBearerAuth()

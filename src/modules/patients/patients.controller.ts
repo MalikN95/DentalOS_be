@@ -63,6 +63,22 @@ export class PatientsController {
     return this.patientsService.findAll(clinic.id, query);
   }
 
+  @Get('catalog/allergies')
+  @ApiOkResponse({ type: [String] })
+  listAllergiesCatalog(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<string[]> {
+    return this.patientsService.listAllergiesCatalog(clinic.id);
+  }
+
+  @Get('catalog/chronic-diseases')
+  @ApiOkResponse({ type: [String] })
+  listChronicDiseasesCatalog(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<string[]> {
+    return this.patientsService.listChronicDiseasesCatalog(clinic.id);
+  }
+
   @Get(':id/history')
   @ApiOkResponse({ description: 'Paginated visit history (appointments)' })
   getHistory(

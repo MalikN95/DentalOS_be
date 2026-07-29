@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreatePatientTagDto {
   @ApiProperty({ example: 'VIP' })
@@ -10,7 +18,8 @@ export class CreatePatientTagDto {
 
   @ApiPropertyOptional({
     example: 210,
-    description: 'Hue in degrees (0-359); omit to auto-generate from the tag id',
+    description:
+      'Hue in degrees (0-359); omit to auto-generate from the tag id',
   })
   @IsOptional()
   @IsInt()

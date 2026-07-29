@@ -50,7 +50,10 @@ export class PatientTagsService {
     return tag;
   }
 
-  create(clinicId: string, dto: CreatePatientTagDto): Promise<PatientTagEntity> {
+  create(
+    clinicId: string,
+    dto: CreatePatientTagDto,
+  ): Promise<PatientTagEntity> {
     const tag = this.tagsRepository.create({
       ...dto,
       clinicId,

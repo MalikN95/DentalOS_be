@@ -25,7 +25,8 @@ export class PatientsService {
     clinicId: string,
     query: ListPatientsQueryDto,
   ): Promise<PaginatedResult<PatientEntity>> {
-    const { page, limit, search, isActive, createdFrom, createdTo, tagIds } = query;
+    const { page, limit, search, isActive, createdFrom, createdTo, tagIds } =
+      query;
 
     const qb = this.patientsRepository
       .createQueryBuilder('patient')
@@ -73,6 +74,22 @@ export class PatientsService {
       .getManyAndCount();
 
     return { items, total, page, limit };
+  }
+
+  async listAllergiesCatalog(clinicId: string): Promise<string[]> {
+    const rows: { value: string }[] = await this.patientsRepository.query(
+      `SELECT DISTINCT value FROM patients, jsonb_array_elements_text(allergies) AS value WHERE "clinicId" = $1 AND "deletedAt" IS NULL ORDER BY value ASC`,
+      [clinicId],
+    );
+    return rows.map((row) => row.value);
+  }
+
+  async listChronicDiseasesCatalog(clinicId: string): Promise<string[]> {
+    const rows: { value: string }[] = await this.patientsRepository.query(
+      `SELECT DISTINCT value FROM patients, jsonb_array_elements_text("chronicDiseases") AS value WHERE "clinicId" = $1 AND "deletedAt" IS NULL ORDER BY value ASC`,
+      [clinicId],
+    );
+    return rows.map((row) => row.value);
   }
 
   async findOne(clinicId: string, id: string): Promise<PatientEntity> {
@@ -132,10 +149,16 @@ export class PatientsService {
     return { items, total, page, limit };
   }
 
-  async addTag(clinicId: string, patientId: string, tagId: string): Promise<PatientEntity> {
+  async addTag(
+    clinicId: string,
+    patientId: string,
+    tagId: string,
+  ): Promise<PatientEntity> {
     const patient = await this.findOne(clinicId, patientId);
 
-    const tag = await this.tagsRepository.findOne({ where: { id: tagId, clinicId } });
+    const tag = await this.tagsRepository.findOne({
+      where: { id: tagId, clinicId },
+    });
     if (!tag) {
       throw new NotFoundException('Tag not found');
     }
@@ -152,7 +175,11 @@ export class PatientsService {
     return patient;
   }
 
-  async removeTag(clinicId: string, patientId: string, tagId: string): Promise<PatientEntity> {
+  async removeTag(
+    clinicId: string,
+    patientId: string,
+    tagId: string,
+  ): Promise<PatientEntity> {
     const patient = await this.findOne(clinicId, patientId);
 
     await this.patientsRepository

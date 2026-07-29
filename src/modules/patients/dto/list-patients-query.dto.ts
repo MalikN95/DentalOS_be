@@ -1,6 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 export class ListPatientsQueryDto extends PaginationQueryDto {
@@ -16,7 +22,9 @@ export class ListPatientsQueryDto extends PaginationQueryDto {
     type: String,
   })
   @IsOptional()
-  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.split(',').filter(Boolean) : value,
+  )
   @IsUUID('all', { each: true })
   tagIds?: string[];
 

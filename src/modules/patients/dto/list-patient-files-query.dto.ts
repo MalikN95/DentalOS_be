@@ -11,7 +11,10 @@ export class ListPatientFilesQueryDto extends PaginationQueryDto {
   @IsEnum(PatientFileType)
   type?: PatientFileType;
 
-  @ApiPropertyOptional({ example: 36, description: 'Filter by FDI tooth number' })
+  @ApiPropertyOptional({
+    example: 36,
+    description: 'Filter by FDI tooth number',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsIn(VALID_TOOTH_NUMBERS, {

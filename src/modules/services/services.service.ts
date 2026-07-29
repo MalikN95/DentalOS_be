@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -74,6 +75,8 @@ export class ServicesService {
   ): Promise<ServiceEntity> {
     const { allowedCabinetIds, categoryId, ...rest } = dto;
 
+    await this.assertNameNotTaken(clinicId, dto.name);
+
     if (categoryId) {
       await this.assertCategoryBelongsToClinic(clinicId, categoryId);
     }
@@ -125,6 +128,23 @@ export class ServicesService {
   async remove(clinicId: string, id: string): Promise<void> {
     const service = await this.findOne(clinicId, id);
     await this.servicesRepository.softRemove(service);
+  }
+
+  private async assertNameNotTaken(
+    clinicId: string,
+    name: string,
+  ): Promise<void> {
+    const existing = await this.servicesRepository
+      .createQueryBuilder('service')
+      .where('service.clinicId = :clinicId', { clinicId })
+      .andWhere('LOWER(service.name) = LOWER(:name)', { name: name.trim() })
+      .getOne();
+
+    if (existing) {
+      throw new ConflictException(
+        `A service named "${name.trim()}" already exists`,
+      );
+    }
   }
 
   private async assertCategoryBelongsToClinic(

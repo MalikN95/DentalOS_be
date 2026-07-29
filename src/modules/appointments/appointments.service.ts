@@ -145,8 +145,15 @@ export class AppointmentsService {
         : Promise.resolve(null),
     ]);
 
+    if (dto.durationMinutes !== undefined && dto.durationMinutes % 15 !== 0) {
+      throw new BadRequestException('durationMinutes must be a multiple of 15');
+    }
+
     const startsAt = new Date(dto.startsAt);
-    const endsAt = this.computeEndsAt(startsAt, service.durationMinutes);
+    const endsAt = this.computeEndsAt(
+      startsAt,
+      dto.durationMinutes ?? service.durationMinutes,
+    );
 
     await this.assertNoConflict(
       clinicId,
