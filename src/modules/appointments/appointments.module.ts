@@ -4,8 +4,10 @@ import { AppointmentEntity } from '../../entities/appointment.entity';
 import { BranchEntity } from '../../entities/branch.entity';
 import { CabinetEntity } from '../../entities/cabinet.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
+import { DoctorScheduleEntity } from '../../entities/doctor-schedule.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderEntity } from '../../entities/reminder.entity';
+import { ScheduleExceptionEntity } from '../../entities/schedule-exception.entity';
 import { ServiceEntity } from '../../entities/service.entity';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
@@ -20,6 +22,8 @@ import { AppointmentsService } from './appointments.service';
       BranchEntity,
       CabinetEntity,
       ReminderEntity,
+      DoctorScheduleEntity,
+      ScheduleExceptionEntity,
     ]),
   ],
   controllers: [AppointmentsController],

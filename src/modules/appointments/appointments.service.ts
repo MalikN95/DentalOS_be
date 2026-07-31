@@ -5,8 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
+import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-own-doctor-profile-id.helper';
+import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import {
   AppointmentEntity,
   AppointmentSource,
@@ -14,8 +21,10 @@ import {
 import { BranchEntity } from '../../entities/branch.entity';
 import { CabinetEntity } from '../../entities/cabinet.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
+import { DoctorScheduleEntity } from '../../entities/doctor-schedule.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderEntity, ReminderStatus } from '../../entities/reminder.entity';
+import { ScheduleExceptionEntity } from '../../entities/schedule-exception.entity';
 import { ServiceEntity } from '../../entities/service.entity';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { QueryAppointmentsDto } from './dto/query-appointments.dto';
@@ -26,6 +35,10 @@ import { UpdateAppointmentStatusDto } from './dto/update-appointment-status.dto'
 const MAX_RANGE_DAYS = 62;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MS_PER_MINUTE = 60 * 1000;
+
+// Postgres error code for a violated EXCLUDE constraint — the last-resort
+// guard against two concurrent requests both passing findConflict().
+const POSTGRES_EXCLUSION_VIOLATION = '23P01';
 
 // Statuses that free up the slot for other bookings
 const NON_BLOCKING_STATUSES: AppointmentStatus[] = [
@@ -39,6 +52,22 @@ const TERMINAL_STATUSES: AppointmentStatus[] = [
   AppointmentStatus.COMPLETED,
   AppointmentStatus.NO_SHOW,
 ];
+
+const toMinutesOfDay = (time: string): number => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// 0 = Monday ... 6 = Sunday, matching DoctorScheduleEntity.weekday
+// (JS Date#getDay: 0 = Sunday).
+const weekdayOf = (date: Date): number => (date.getDay() + 6) % 7;
+
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 @Injectable()
 export class AppointmentsService {
@@ -57,12 +86,23 @@ export class AppointmentsService {
     private readonly cabinetsRepository: Repository<CabinetEntity>,
     @InjectRepository(ReminderEntity)
     private readonly remindersRepository: Repository<ReminderEntity>,
+    @InjectRepository(DoctorScheduleEntity)
+    private readonly doctorSchedulesRepository: Repository<DoctorScheduleEntity>,
+    @InjectRepository(ScheduleExceptionEntity)
+    private readonly scheduleExceptionsRepository: Repository<ScheduleExceptionEntity>,
   ) {}
 
   async findMany(
     clinicId: string,
     query: QueryAppointmentsDto,
+    user: JwtPayload,
   ): Promise<AppointmentEntity[]> {
+    const ownDoctorProfileId = await resolveOwnDoctorProfileIdIfDoctor(
+      this.doctorProfilesRepository,
+      clinicId,
+      user,
+    );
+
     const from = new Date(query.from);
     const to = new Date(query.to);
 
@@ -88,7 +128,13 @@ export class AppointmentsService {
       .andWhere('appointment.endsAt > :from', { from })
       .orderBy('appointment.startsAt', 'ASC');
 
-    if (query.doctorProfileId) {
+    if (ownDoctorProfileId) {
+      // A doctor only ever sees their own appointments — any doctorProfileId
+      // passed in the query is ignored rather than trusted.
+      qb.andWhere('appointment.doctorProfileId = :ownDoctorProfileId', {
+        ownDoctorProfileId,
+      });
+    } else if (query.doctorProfileId) {
       qb.andWhere('appointment.doctorProfileId = :doctorProfileId', {
         doctorProfileId: query.doctorProfileId,
       });
@@ -113,9 +159,28 @@ export class AppointmentsService {
     return qb.getMany();
   }
 
-  async findOne(clinicId: string, id: string): Promise<AppointmentEntity> {
+  // `user` is only passed from the controller's own GET :id route — internal
+  // callers (create/reschedule/update/updateStatus fetching the record they
+  // just touched) omit it and stay unscoped.
+  async findOne(
+    clinicId: string,
+    id: string,
+    user?: JwtPayload,
+  ): Promise<AppointmentEntity> {
+    const ownDoctorProfileId = user
+      ? await resolveOwnDoctorProfileIdIfDoctor(
+          this.doctorProfilesRepository,
+          clinicId,
+          user,
+        )
+      : null;
+
     const appointment = await this.appointmentsRepository.findOne({
-      where: { id, clinicId },
+      where: {
+        id,
+        clinicId,
+        ...(ownDoctorProfileId ? { doctorProfileId: ownDoctorProfileId } : {}),
+      },
       relations: {
         patient: true,
         doctorProfile: { user: true },
@@ -155,6 +220,13 @@ export class AppointmentsService {
       dto.durationMinutes ?? service.durationMinutes,
     );
 
+    await this.assertWithinWorkingHours(
+      dto.doctorProfileId,
+      dto.branchId,
+      startsAt,
+      endsAt,
+    );
+
     await this.assertNoConflict(
       clinicId,
       dto.doctorProfileId,
@@ -178,7 +250,7 @@ export class AppointmentsService {
       comment: dto.comment ?? null,
     });
 
-    const saved = await this.appointmentsRepository.save(appointment);
+    const saved = await this.saveAppointment(appointment);
 
     return this.findOne(clinicId, saved.id);
   }
@@ -208,8 +280,16 @@ export class AppointmentsService {
 
     const doctorProfileId = dto.doctorProfileId ?? appointment.doctorProfileId;
     const cabinetId = dto.cabinetId ?? appointment.cabinetId;
+    const branchId = dto.branchId ?? appointment.branchId;
     const startsAt = new Date(dto.startsAt);
     const endsAt = this.computeEndsAt(startsAt, service.durationMinutes);
+
+    await this.assertWithinWorkingHours(
+      doctorProfileId,
+      branchId,
+      startsAt,
+      endsAt,
+    );
 
     await this.assertNoConflict(
       clinicId,
@@ -222,11 +302,11 @@ export class AppointmentsService {
 
     appointment.doctorProfileId = doctorProfileId;
     appointment.cabinetId = cabinetId;
-    appointment.branchId = dto.branchId ?? appointment.branchId;
+    appointment.branchId = branchId;
     appointment.startsAt = startsAt;
     appointment.endsAt = endsAt;
 
-    await this.appointmentsRepository.save(appointment);
+    await this.saveAppointment(appointment);
 
     return this.findOne(clinicId, id);
   }
@@ -284,6 +364,13 @@ export class AppointmentsService {
         service.durationMinutes,
       );
 
+      await this.assertWithinWorkingHours(
+        appointment.doctorProfileId,
+        appointment.branchId,
+        appointment.startsAt,
+        endsAt,
+      );
+
       await this.assertNoConflict(
         clinicId,
         appointment.doctorProfileId,
@@ -302,7 +389,7 @@ export class AppointmentsService {
       appointment.comment = dto.comment;
     }
 
-    await this.appointmentsRepository.save(appointment);
+    await this.saveAppointment(appointment);
 
     return this.findOne(clinicId, id);
   }
@@ -404,6 +491,80 @@ export class AppointmentsService {
 
   private computeEndsAt(startsAt: Date, durationMinutes: number): Date {
     return new Date(startsAt.getTime() + durationMinutes * MS_PER_MINUTE);
+  }
+
+  private async assertWithinWorkingHours(
+    doctorProfileId: string,
+    branchId: string,
+    startsAt: Date,
+    endsAt: Date,
+  ): Promise<void> {
+    const schedule = await this.doctorSchedulesRepository.findOne({
+      where: { doctorProfileId, branchId, weekday: weekdayOf(startsAt) },
+    });
+
+    // Minutes since local midnight of startsAt's own calendar day — endMinutes
+    // exceeds 1440 (and so always fails) if the appointment spans past midnight.
+    const dayStart = new Date(startsAt);
+    dayStart.setHours(0, 0, 0, 0);
+    const startMinutes = Math.round(
+      (startsAt.getTime() - dayStart.getTime()) / MS_PER_MINUTE,
+    );
+    const endMinutes = Math.round(
+      (endsAt.getTime() - dayStart.getTime()) / MS_PER_MINUTE,
+    );
+
+    const fitsSchedule =
+      schedule !== null &&
+      startMinutes >= toMinutesOfDay(schedule.startTime) &&
+      endMinutes <= toMinutesOfDay(schedule.endTime);
+
+    if (!fitsSchedule) {
+      throw new BadRequestException({
+        message: "Appointment is outside the doctor's working hours",
+        code: 'OUTSIDE_WORKING_HOURS',
+      });
+    }
+
+    const date = formatLocalDate(startsAt);
+    const isDayOff = await this.scheduleExceptionsRepository.exists({
+      where: {
+        doctorProfileId,
+        dateFrom: LessThanOrEqual(date),
+        dateTo: MoreThanOrEqual(date),
+      },
+    });
+
+    if (isDayOff) {
+      throw new BadRequestException({
+        message: 'Doctor is not working on this date',
+        code: 'DOCTOR_DAY_OFF',
+      });
+    }
+  }
+
+  // findConflict() is a SELECT-then-INSERT check, so it can't stop two
+  // concurrent requests from both passing it for the same slot. The DB-level
+  // EXCLUDE constraint on (doctorProfileId, period) is the actual guarantee;
+  // this turns its violation into the same 409 the pre-check produces.
+  private async saveAppointment(
+    appointment: AppointmentEntity,
+  ): Promise<AppointmentEntity> {
+    try {
+      return await this.appointmentsRepository.save(appointment);
+    } catch (err) {
+      if (
+        err instanceof QueryFailedError &&
+        (err as unknown as { code?: string }).code ===
+          POSTGRES_EXCLUSION_VIOLATION
+      ) {
+        throw new ConflictException(
+          'Doctor already has an appointment in this time slot',
+        );
+      }
+
+      throw err;
+    }
   }
 
   private async assertNoConflict(

@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
+import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-own-doctor-profile-id.helper';
+import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import { AppointmentEntity } from '../../entities/appointment.entity';
+import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { PatientTagEntity } from '../../entities/patient-tag.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { CreatePatientDto } from './dto/create-patient.dto';
@@ -9,6 +12,13 @@ import { ListPatientsQueryDto } from './dto/list-patients-query.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PaginatedResult } from './patients.types';
+
+const OWN_PATIENTS_EXISTS = `EXISTS (
+  SELECT 1 FROM appointments a
+  WHERE a."patientId" = patient.id
+    AND a."doctorProfileId" = :ownDoctorProfileId
+    AND a."deletedAt" IS NULL
+)`;
 
 @Injectable()
 export class PatientsService {
@@ -19,19 +29,33 @@ export class PatientsService {
     private readonly appointmentsRepository: Repository<AppointmentEntity>,
     @InjectRepository(PatientTagEntity)
     private readonly tagsRepository: Repository<PatientTagEntity>,
+    @InjectRepository(DoctorProfileEntity)
+    private readonly doctorProfilesRepository: Repository<DoctorProfileEntity>,
   ) {}
 
   async findAll(
     clinicId: string,
     query: ListPatientsQueryDto,
+    user: JwtPayload,
   ): Promise<PaginatedResult<PatientEntity>> {
     const { page, limit, search, isActive, createdFrom, createdTo, tagIds } =
       query;
+
+    const ownDoctorProfileId = await resolveOwnDoctorProfileIdIfDoctor(
+      this.doctorProfilesRepository,
+      clinicId,
+      user,
+    );
 
     const qb = this.patientsRepository
       .createQueryBuilder('patient')
       .leftJoinAndSelect('patient.tags', 'tags')
       .where('patient.clinicId = :clinicId', { clinicId });
+
+    if (ownDoctorProfileId) {
+      // A doctor only ever sees patients they've had an appointment with.
+      qb.andWhere(OWN_PATIENTS_EXISTS, { ownDoctorProfileId });
+    }
 
     if (isActive !== undefined) {
       qb.andWhere('patient.isActive = :isActive', { isActive });
@@ -92,11 +116,33 @@ export class PatientsService {
     return rows.map((row) => row.value);
   }
 
-  async findOne(clinicId: string, id: string): Promise<PatientEntity> {
-    const patient = await this.patientsRepository.findOne({
-      where: { id, clinicId },
-      relations: { tags: true },
-    });
+  // `user` is only passed from the controller's own GET :id route — internal
+  // callers (update/remove/addTag/etc. acting on a patient already reached
+  // through a write-gated route) omit it and stay unscoped.
+  async findOne(
+    clinicId: string,
+    id: string,
+    user?: JwtPayload,
+  ): Promise<PatientEntity> {
+    const ownDoctorProfileId = user
+      ? await resolveOwnDoctorProfileIdIfDoctor(
+          this.doctorProfilesRepository,
+          clinicId,
+          user,
+        )
+      : null;
+
+    const qb = this.patientsRepository
+      .createQueryBuilder('patient')
+      .leftJoinAndSelect('patient.tags', 'tags')
+      .where('patient.id = :id', { id })
+      .andWhere('patient.clinicId = :clinicId', { clinicId });
+
+    if (ownDoctorProfileId) {
+      qb.andWhere(OWN_PATIENTS_EXISTS, { ownDoctorProfileId });
+    }
+
+    const patient = await qb.getOne();
 
     if (!patient) {
       throw new NotFoundException('Patient not found');
@@ -129,8 +175,9 @@ export class PatientsService {
     clinicId: string,
     patientId: string,
     query: PaginationQueryDto,
+    user?: JwtPayload,
   ): Promise<PaginatedResult<AppointmentEntity>> {
-    await this.findOne(clinicId, patientId);
+    await this.findOne(clinicId, patientId, user);
 
     const { page, limit } = query;
     const [items, total] = await this.appointmentsRepository.findAndCount({

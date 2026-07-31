@@ -39,18 +39,20 @@ export class TreatmentPlansController {
   @ApiOperation({ summary: 'List treatment plans of a patient' })
   list(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser() user: JwtPayload,
     @Query() query: ListTreatmentPlansQueryDto,
   ): Promise<PaginatedResult<TreatmentPlanEntity>> {
-    return this.treatmentPlansService.list(clinic.id, query);
+    return this.treatmentPlansService.list(clinic.id, query, user);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a treatment plan by id' })
   findOne(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TreatmentPlanEntity> {
-    return this.treatmentPlansService.findOne(clinic.id, id);
+    return this.treatmentPlansService.findOne(clinic.id, id, user);
   }
 
   @Post()

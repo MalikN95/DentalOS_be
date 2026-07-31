@@ -9,6 +9,7 @@ import {
   MoreThanOrEqual,
   Repository,
 } from 'typeorm';
+import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-own-doctor-profile-id.helper';
 import { JwtPayload } from '../../common/types/jwt-payload.type';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { PatientEntity } from '../../entities/patient.entity';
@@ -44,6 +45,7 @@ export class TreatmentPlansService {
   async list(
     clinicId: string,
     query: ListTreatmentPlansQueryDto,
+    user: JwtPayload,
   ): Promise<PaginatedResult<TreatmentPlanEntity>> {
     if (query.patientId) {
       await assertPatientInClinic(
@@ -53,11 +55,22 @@ export class TreatmentPlansService {
       );
     }
 
+    const ownDoctorProfileId = await resolveOwnDoctorProfileIdIfDoctor(
+      this.doctorProfileRepository,
+      clinicId,
+      user,
+    );
+
     // Clinic scoping goes through the patient relation: TreatmentPlanEntity
     // has no clinicId column of its own.
     const where: FindOptionsWhere<TreatmentPlanEntity> = {
       patient: { clinicId },
     };
+
+    if (ownDoctorProfileId) {
+      // A doctor only ever sees plans they authored themselves.
+      where.doctorProfileId = ownDoctorProfileId;
+    }
 
     if (query.patientId) {
       where.patientId = query.patientId;
@@ -89,9 +102,28 @@ export class TreatmentPlansService {
     return { items, total, page: query.page, limit: query.limit };
   }
 
-  async findOne(clinicId: string, id: string): Promise<TreatmentPlanEntity> {
+  // `user` is only passed from the controller's own GET :id route — internal
+  // callers (update/replaceItems/remove acting on a plan already reached
+  // through a write-gated route) omit it and stay unscoped.
+  async findOne(
+    clinicId: string,
+    id: string,
+    user?: JwtPayload,
+  ): Promise<TreatmentPlanEntity> {
+    const ownDoctorProfileId = user
+      ? await resolveOwnDoctorProfileIdIfDoctor(
+          this.doctorProfileRepository,
+          clinicId,
+          user,
+        )
+      : null;
+
     const plan = await this.planRepository.findOne({
-      where: { id, patient: { clinicId } },
+      where: {
+        id,
+        patient: { clinicId },
+        ...(ownDoctorProfileId ? { doctorProfileId: ownDoctorProfileId } : {}),
+      },
       relations: { items: { service: true }, doctorProfile: { user: true } },
       order: { items: { sortOrder: 'ASC' } },
     });

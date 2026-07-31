@@ -13,8 +13,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentClinic } from '../../common/decorators/current-clinic.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { AppointmentsService } from './appointments.service';
@@ -49,18 +51,20 @@ export class AppointmentsController {
   @ApiOkResponse({ type: AppointmentEntity, isArray: true })
   findMany(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser() user: JwtPayload,
     @Query() query: QueryAppointmentsDto,
   ): Promise<AppointmentEntity[]> {
-    return this.appointmentsService.findMany(clinic.id, query);
+    return this.appointmentsService.findMany(clinic.id, query, user);
   }
 
   @Get(':id')
   @ApiOkResponse({ type: AppointmentEntity })
   findOne(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AppointmentEntity> {
-    return this.appointmentsService.findOne(clinic.id, id);
+    return this.appointmentsService.findOne(clinic.id, id, user);
   }
 
   @Post()
