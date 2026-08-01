@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -46,4 +47,23 @@ export class StaffDoctorDto {
   @ValidateIf((dto: StaffDoctorDto) => dto.description !== null)
   @IsString()
   description?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether this doctor is offered through the public online-booking widget',
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptsOnlineBooking?: boolean;
+
+  @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    description:
+      'Services this doctor provides; drives online-booking doctor filtering',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  serviceIds?: string[];
 }

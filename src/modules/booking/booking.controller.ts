@@ -14,6 +14,7 @@ import { ClinicEntity } from '../../entities/clinic.entity';
 import { AvailabilityService } from './availability.service';
 import { BookingService } from './booking.service';
 import { BookingBranchDto } from './dto/booking-branch.dto';
+import { BookingClinicDto } from './dto/booking-clinic.dto';
 import { BookingConfirmationDto } from './dto/booking-confirmation.dto';
 import { BookingDaysQueryDto } from './dto/booking-days-query.dto';
 import { BookingDoctorDto } from './dto/booking-doctor.dto';
@@ -29,6 +30,15 @@ export class BookingController {
     private readonly bookingService: BookingService,
     private readonly availabilityService: AvailabilityService,
   ) {}
+
+  @Public()
+  @Get('clinic')
+  @ApiOkResponse({ type: BookingClinicDto })
+  getClinicInfo(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<BookingClinicDto> {
+    return this.bookingService.getClinicInfo(clinic);
+  }
 
   @Public()
   @Get('branches')

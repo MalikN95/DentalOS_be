@@ -10,6 +10,7 @@ import { Brackets, In, Repository } from 'typeorm';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { BranchEntity } from '../../entities/branch.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
+import { ServiceEntity } from '../../entities/service.entity';
 import { UserEntity } from '../../entities/user.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { ListStaffQueryDto } from './dto/list-staff-query.dto';
@@ -33,6 +34,8 @@ export class StaffService {
     private readonly doctorsRepository: Repository<DoctorProfileEntity>,
     @InjectRepository(BranchEntity)
     private readonly branchesRepository: Repository<BranchEntity>,
+    @InjectRepository(ServiceEntity)
+    private readonly servicesRepository: Repository<ServiceEntity>,
   ) {}
 
   async findAll(
@@ -87,11 +90,19 @@ export class StaffService {
       user.role === UserRole.DOCTOR
         ? await this.doctorsRepository.findOne({
             where: { clinicId, userId: user.id },
-            relations: { branch: true },
+            relations: { branch: true, services: true },
           })
         : null;
 
     return this.toStaffMember(user, profile);
+  }
+
+  async listSpecializationsCatalog(clinicId: string): Promise<string[]> {
+    const rows: { value: string }[] = await this.doctorsRepository.query(
+      `SELECT DISTINCT value FROM doctor_profiles, jsonb_array_elements_text(specializations) AS value WHERE "clinicId" = $1 AND "deletedAt" IS NULL ORDER BY value ASC`,
+      [clinicId],
+    );
+    return rows.map((row) => row.value);
   }
 
   async create(clinicId: string, dto: CreateStaffDto): Promise<StaffMember> {
@@ -278,7 +289,7 @@ export class StaffService {
 
     const profiles = await this.doctorsRepository.find({
       where: { clinicId, userId: In(doctorIds) },
-      relations: { branch: true },
+      relations: { branch: true, services: true },
     });
 
     return new Map(profiles.map((profile) => [profile.userId, profile]));
@@ -296,6 +307,7 @@ export class StaffService {
 
     const existing = await this.doctorsRepository.findOne({
       where: { userId },
+      relations: { services: true },
       withDeleted: true,
     });
 
@@ -309,6 +321,10 @@ export class StaffService {
           experienceYears: dto.experienceYears ?? 0,
           education: dto.education ?? [],
           specializations: dto.specializations ?? [],
+          acceptsOnlineBooking: dto.acceptsOnlineBooking ?? false,
+          services: dto.serviceIds
+            ? await this.getOwnedServices(clinicId, dto.serviceIds)
+            : [],
           isActive: true,
         }),
       );
@@ -339,9 +355,39 @@ export class StaffService {
       existing.specializations = dto.specializations;
     }
 
+    if (dto.acceptsOnlineBooking !== undefined) {
+      existing.acceptsOnlineBooking = dto.acceptsOnlineBooking;
+    }
+
+    if (dto.serviceIds !== undefined) {
+      existing.services = await this.getOwnedServices(clinicId, dto.serviceIds);
+    }
+
     existing.isActive = true;
 
     await this.doctorsRepository.save(existing);
+  }
+
+  private async getOwnedServices(
+    clinicId: string,
+    serviceIds: string[],
+  ): Promise<ServiceEntity[]> {
+    if (serviceIds.length === 0) {
+      return [];
+    }
+
+    const uniqueIds = [...new Set(serviceIds)];
+    const services = await this.servicesRepository.find({
+      where: { id: In(uniqueIds), clinicId },
+    });
+
+    if (services.length !== uniqueIds.length) {
+      throw new BadRequestException(
+        'One or more services do not belong to this clinic',
+      );
+    }
+
+    return services;
   }
 
   private async removeDoctorProfile(
@@ -401,6 +447,11 @@ export class StaffService {
       experienceYears: profile.experienceYears,
       description: profile.description,
       isActive: profile.isActive,
+      acceptsOnlineBooking: profile.acceptsOnlineBooking,
+      services: (profile.services ?? []).map((service) => ({
+        id: service.id,
+        name: service.name,
+      })),
     };
   }
 }

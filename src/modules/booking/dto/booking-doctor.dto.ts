@@ -4,6 +4,11 @@ export class BookingDoctorDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
 
+  // Always set: getDoctors() only returns doctors with a resolved branch,
+  // since the widget no longer asks the patient to pick one.
+  @ApiProperty({ format: 'uuid' })
+  branchId: string;
+
   @ApiProperty()
   firstName: string;
 

@@ -5,13 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  Brackets,
-  DataSource,
-  EntityManager,
-  Repository,
-  SelectQueryBuilder,
-} from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import {
@@ -21,7 +15,6 @@ import {
 import { BranchEntity } from '../../entities/branch.entity';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
-import { DoctorScheduleEntity } from '../../entities/doctor-schedule.entity';
 import { LeadEntity, LeadStage } from '../../entities/lead.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderSettingEntity } from '../../entities/reminder-setting.entity';
@@ -35,6 +28,7 @@ import {
   AvailabilityService,
 } from './availability.service';
 import { BookingBranchDto } from './dto/booking-branch.dto';
+import { BookingClinicDto } from './dto/booking-clinic.dto';
 import { BookingConfirmationDto } from './dto/booking-confirmation.dto';
 import { BookingDoctorDto } from './dto/booking-doctor.dto';
 import { BookingDoctorsQueryDto } from './dto/booking-doctors-query.dto';
@@ -64,6 +58,16 @@ export class BookingService {
     private readonly storageService: StorageService,
   ) {}
 
+  async getClinicInfo(clinic: ClinicEntity): Promise<BookingClinicDto> {
+    return {
+      name: clinic.name,
+      logoUrl: clinic.logoKey
+        ? await this.storageService.getDownloadUrl(clinic.logoKey)
+        : null,
+      currency: clinic.currency,
+    };
+  }
+
   async getBranches(clinicId: string): Promise<BookingBranchDto[]> {
     const branches = await this.branchRepository.find({
       where: { clinicId, isActive: true },
@@ -88,7 +92,7 @@ export class BookingService {
         order: { sortOrder: 'ASC', name: 'ASC' },
       }),
       this.serviceRepository.find({
-        where: { clinicId, isActive: true },
+        where: { clinicId, isActive: true, acceptsOnlineBooking: true },
         order: { name: 'ASC' },
       }),
     ]);
@@ -128,8 +132,10 @@ export class BookingService {
     clinicId: string,
     query: BookingDoctorsQueryDto,
   ): Promise<BookingDoctorDto[]> {
-    const { serviceId, branchId } = query;
+    const { serviceId } = query;
 
+    // The widget no longer asks the patient to pick a branch, so a doctor is
+    // only bookable here if they have one resolved branch to schedule at.
     const doctors = await this.doctorRepository
       .createQueryBuilder('doctor')
       .innerJoin('doctor.services', 'service', 'service.id = :serviceId', {
@@ -138,24 +144,9 @@ export class BookingService {
       .innerJoinAndSelect('doctor.user', 'user')
       .where('doctor.clinicId = :clinicId', { clinicId })
       .andWhere('doctor.isActive = true')
+      .andWhere('doctor.acceptsOnlineBooking = true')
+      .andWhere('doctor.branchId IS NOT NULL')
       .andWhere('user.isActive = true')
-      .andWhere(
-        new Brackets((qb) => {
-          qb.where('doctor.branchId = :branchId', { branchId }).orWhere(
-            (subQb: SelectQueryBuilder<DoctorProfileEntity>) => {
-              const subQuery = subQb
-                .subQuery()
-                .select('1')
-                .from(DoctorScheduleEntity, 'schedule')
-                .where('schedule.doctorProfileId = doctor.id')
-                .andWhere('schedule.branchId = :branchId')
-                .getQuery();
-
-              return `EXISTS ${subQuery}`;
-            },
-          );
-        }),
-      )
       .orderBy('user.lastName', 'ASC')
       .addOrderBy('user.firstName', 'ASC')
       .getMany();
@@ -163,6 +154,7 @@ export class BookingService {
     return Promise.all(
       doctors.map(async (doctor) => ({
         id: doctor.id,
+        branchId: doctor.branchId as string,
         firstName: doctor.user.firstName,
         lastName: doctor.user.lastName,
         photoUrl: doctor.photoKey
@@ -180,7 +172,12 @@ export class BookingService {
     dto: CreateBookingDto,
   ): Promise<BookingConfirmationDto> {
     const doctor = await this.doctorRepository.findOne({
-      where: { id: dto.doctorProfileId, clinicId: clinic.id, isActive: true },
+      where: {
+        id: dto.doctorProfileId,
+        clinicId: clinic.id,
+        isActive: true,
+        acceptsOnlineBooking: true,
+      },
       relations: { user: true },
     });
 

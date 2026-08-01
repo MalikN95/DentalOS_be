@@ -17,6 +17,11 @@ export interface PaginatedResult<T> {
   limit: number;
 }
 
+export interface StaffDoctorServiceOption {
+  id: string;
+  name: string;
+}
+
 export interface StaffDoctorProfile {
   id: string;
   branchId: string | null;
@@ -26,6 +31,8 @@ export interface StaffDoctorProfile {
   experienceYears: number;
   description: string | null;
   isActive: boolean;
+  acceptsOnlineBooking: boolean;
+  services: StaffDoctorServiceOption[];
 }
 
 export interface StaffMember {

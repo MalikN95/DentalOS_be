@@ -243,7 +243,12 @@ export class AvailabilityService {
     }
 
     const doctor = await repos.doctor.findOne({
-      where: { id: doctorProfileId, clinicId, isActive: true },
+      where: {
+        id: doctorProfileId,
+        clinicId,
+        isActive: true,
+        acceptsOnlineBooking: true,
+      },
     });
 
     if (!doctor) {
@@ -251,7 +256,12 @@ export class AvailabilityService {
     }
 
     const service = await repos.service.findOne({
-      where: { id: serviceId, clinicId, isActive: true },
+      where: {
+        id: serviceId,
+        clinicId,
+        isActive: true,
+        acceptsOnlineBooking: true,
+      },
       relations: { allowedCabinets: true },
     });
 

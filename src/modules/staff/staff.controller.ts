@@ -46,6 +46,14 @@ export class StaffController {
     return this.staffService.findAll(clinic.id, query);
   }
 
+  @Get('catalog/specializations')
+  @ApiOkResponse({ type: [String] })
+  listSpecializationsCatalog(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<string[]> {
+    return this.staffService.listSpecializationsCatalog(clinic.id);
+  }
+
   @Get(':id')
   @ApiOkResponse({
     description: 'Employee with the doctor profile when present',

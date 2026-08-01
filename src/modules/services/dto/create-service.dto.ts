@@ -75,4 +75,13 @@ export class CreateServiceDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Whether this service is offered through the public online-booking widget',
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptsOnlineBooking?: boolean;
 }

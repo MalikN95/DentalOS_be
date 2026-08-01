@@ -63,4 +63,8 @@ export class ServiceEntity extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  // Only services with this on are offered through the public online-booking widget.
+  @Column({ default: false })
+  acceptsOnlineBooking: boolean;
 }

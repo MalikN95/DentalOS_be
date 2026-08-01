@@ -65,4 +65,8 @@ export class DoctorProfileEntity extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  // Only doctors with this on are offered through the public online-booking widget.
+  @Column({ default: false })
+  acceptsOnlineBooking: boolean;
 }
