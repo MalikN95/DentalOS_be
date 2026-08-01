@@ -35,4 +35,17 @@ export const envValidationSchema = Joi.object({
   SMTP_PASSWORD: Joi.string().required(),
   SMTP_FROM_EMAIL: Joi.string().email().required(),
   SMTP_FROM_NAME: Joi.string().default('DentalOS'),
+
+  // WhatsApp (Meta Cloud API) — optional; the WhatsApp sender no-ops (logs a
+  // warning) until these are set.
+  WHATSAPP_ACCESS_TOKEN: Joi.string().allow('').optional(),
+  WHATSAPP_PHONE_NUMBER_ID: Joi.string().allow('').optional(),
+  WHATSAPP_BUSINESS_ACCOUNT_ID: Joi.string().allow('').optional(),
+  WHATSAPP_API_VERSION: Joi.string().default('v21.0'),
+
+  // Firebase Cloud Messaging (web push) — optional; the FCM sender no-ops
+  // (logs a warning) until these are set.
+  FIREBASE_PROJECT_ID: Joi.string().allow('').optional(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().allow('').optional(),
+  FIREBASE_PRIVATE_KEY: Joi.string().allow('').optional(),
 });

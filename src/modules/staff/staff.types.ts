@@ -1,4 +1,5 @@
 import { UserRole } from '../../common/enums/user-role.enum';
+import { StaffNotificationPreferences } from '../../common/types/notification-preferences.type';
 
 /** Roles that represent clinic employees (patients and platform admins excluded). */
 export const STAFF_ROLES: readonly UserRole[] = [
@@ -46,6 +47,7 @@ export interface StaffMember {
   mfaEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
+  notificationPreferences: StaffNotificationPreferences;
   /** Present only for users with the DOCTOR role that have a profile. */
   doctorProfile: StaffDoctorProfile | null;
 }

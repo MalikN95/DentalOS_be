@@ -11,6 +11,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { PatientNotificationPreferencesDto } from '../../../common/dto/notification-preferences.dto';
 import { Gender } from '../../../common/enums/gender.enum';
 import { PatientInsurance } from '../../../entities/patient.entity';
 
@@ -89,4 +90,10 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   comments?: string;
+
+  @ApiPropertyOptional({ type: PatientNotificationPreferencesDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PatientNotificationPreferencesDto)
+  notificationPreferences?: PatientNotificationPreferencesDto;
 }

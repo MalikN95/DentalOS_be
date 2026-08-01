@@ -124,6 +124,28 @@ There is no per-clinic subdomain — every clinic's staff/owner/admin logs into 
 
 All routes are protected by default (global guard); public routes are marked with `@Public()`. Role checks via `@Roles(UserRole.DOCTOR)`.
 
+## Notifications
+
+`src/modules/notifications/` is a channel-agnostic dispatcher (`NotificationsService.send(channel, message)`), `@Global()` so any module can inject it. Six channels exist on the `NotificationChannel` enum (`sms`, `email`, `push`, `telegram`, `whatsapp`, `in_app`); each has a `NotificationSender` implementation registered in `notifications.module.ts#createSenders`:
+
+- **Email** (`senders/mail.sender.ts`) — wraps `MailService`, real SMTP via nodemailer.
+- **WhatsApp** (`senders/whatsapp.sender.ts`) — Meta WhatsApp Cloud API, plain HTTPS `fetch`. Needs `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` (see `.env.example`); no-ops with a logged warning until set. Free-form text only delivers inside the 24h customer-service window — proactive reminders outside that window need a pre-approved message template instead (not yet implemented; ask if you hit this).
+- **Push** (`senders/fcm.sender.ts`) — Firebase Cloud Messaging via `firebase-admin`. Needs `FIREBASE_PROJECT_ID` + `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY` (service account credentials, from Firebase Console → Project Settings → Service Accounts); no-ops until set. `message.to` is a device token — see `users.fcmTokens` below.
+- **In-app** (`senders/in-app.sender.ts`) — writes a row to the `notifications` table (`NotificationEntity`); this is what the kabinet's bell reads. `message.to` is a `userId`, and `message.clinicId` must be set (the only channel where the generic `NotificationMessage` shape needs that extra field).
+- **SMS / Telegram** — still `LogSender` placeholders (log only), unchanged from before.
+
+**Per-person channel preferences** (this is what the patient/staff card checkboxes write):
+- `PatientEntity.notificationPreferences` (`{ email, whatsapp }`, default both `true`) — gates appointment reminders (`ReminderProcessorService#hasConsent`) and review requests (`ReviewsService#sendReviewRequest`). Patients have no in-app inbox or push (no dashboard login), so only these two channels are offered.
+- `UserEntity.notificationPreferences` (`{ email, whatsapp, push, inApp }`, default all `true`) — gates the one staff-facing event so far: `BookingService#notifyAssignedDoctor`, fired when a patient books online, notifying the assigned doctor on whichever channels they've enabled.
+- `UserEntity.fcmTokens` (`string[]`) — a user's registered web-push device tokens (a browser tab registers one via `POST /notifications/push-subscriptions` after the user grants permission). Multiple tokens per user are normal (several browsers/devices).
+
+**In-app inbox API** (`notifications.controller.ts`, all under `/api/notifications`, authenticated):
+- `GET /` — paginated list for the current user (`?page&limit&unreadOnly`), includes `unreadCount`.
+- `PATCH /:id/read`, `PATCH /read-all` — mark as read.
+- `POST /push-subscriptions`, `DELETE /push-subscriptions` — register/unregister an FCM device token (body: `{ token }`).
+
+Adding a new notification event elsewhere: inject `NotificationsService`, check the recipient's `notificationPreferences` for the channel(s) you're using (default to `true` if the field is somehow missing, to preserve existing behavior), then `send()`/`sendToMany()`.
+
 ## Staff API (`/api/staff`)
 
 Clinic employees = clinic users whose role is one of `owner | admin | doctor | receptionist | assistant | accountant` (`STAFF_ROLES`); patients and platform super-admins are never listed.

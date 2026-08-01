@@ -55,6 +55,8 @@ export class BookingService {
     private readonly doctorRepository: Repository<DoctorProfileEntity>,
     @InjectRepository(ReviewEntity)
     private readonly reviewRepository: Repository<ReviewEntity>,
+    @InjectRepository(PatientEntity)
+    private readonly patientsRepository: Repository<PatientEntity>,
     private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
     private readonly notificationsService: NotificationsService,
@@ -263,7 +265,7 @@ export class BookingService {
       branchId: dto.branchId,
     };
 
-    const { appointment, service } = await this.dataSource.transaction(
+    const { appointment, service, patient } = await this.dataSource.transaction(
       async (manager) => {
         const slot = await this.availabilityService.resolveSlot(
           manager,
@@ -279,20 +281,38 @@ export class BookingService {
         }
 
         const patientRepository = manager.getRepository(PatientEntity);
-        let patient = await patientRepository.findOne({
+        let bookingPatient = await patientRepository.findOne({
           where: { clinicId: clinic.id, phone: dto.phone },
         });
 
-        if (!patient) {
-          patient = await patientRepository.save(
+        if (!bookingPatient) {
+          bookingPatient = await patientRepository.save(
             patientRepository.create({
               clinicId: clinic.id,
               firstName: dto.firstName,
               lastName: dto.lastName,
               phone: dto.phone,
               email: dto.email ?? null,
+              ...(dto.notificationPreferences
+                ? {
+                    notificationPreferences: {
+                      ...dto.notificationPreferences,
+                      push: true,
+                    },
+                  }
+                : {}),
             }),
           );
+        } else if (dto.notificationPreferences) {
+          // Re-affirmed at booking time — email/whatsapp only; push stays as
+          // whatever this patient already has (set via push-subscription, if any).
+          bookingPatient = await patientRepository.save({
+            ...bookingPatient,
+            notificationPreferences: {
+              ...bookingPatient.notificationPreferences,
+              ...dto.notificationPreferences,
+            },
+          });
         }
 
         const appointmentRepository = manager.getRepository(AppointmentEntity);
@@ -301,7 +321,7 @@ export class BookingService {
             clinicId: clinic.id,
             branchId: dto.branchId,
             doctorProfileId: dto.doctorProfileId,
-            patientId: patient.id,
+            patientId: bookingPatient.id,
             serviceId: dto.serviceId,
             cabinetId: slot.cabinetId,
             startsAt: slot.startsAt,
@@ -322,23 +342,36 @@ export class BookingService {
             email: dto.email ?? null,
             stage: LeadStage.NEW,
             source: LEAD_SOURCE_ONLINE_BOOKING,
-            patientId: patient.id,
+            patientId: bookingPatient.id,
             appointmentId: createdAppointment.id,
           }),
         );
 
         await this.createReminders(manager, clinic.id, createdAppointment);
 
-        return { appointment: createdAppointment, service: slot.service };
+        return {
+          appointment: createdAppointment,
+          service: slot.service,
+          patient: bookingPatient,
+        };
       },
     );
 
     const doctorName = `${doctor.user.firstName} ${doctor.user.lastName}`;
 
-    await this.sendConfirmation(clinic, dto, service, doctorName, branch);
+    await this.sendConfirmation(
+      clinic,
+      dto,
+      service,
+      doctorName,
+      branch,
+      patient,
+    );
+    await this.notifyAssignedDoctor(clinic, doctor, dto, service);
 
     return {
       appointmentId: appointment.id,
+      patientId: patient.id,
       status: appointment.status,
       startsAt: appointment.startsAt,
       doctorName,
@@ -386,6 +419,7 @@ export class BookingService {
     service: ServiceEntity,
     doctorName: string,
     branch: BranchEntity,
+    patient: PatientEntity,
   ): Promise<void> {
     const lines = [
       `${clinic.name}: your appointment is booked.`,
@@ -401,6 +435,10 @@ export class BookingService {
 
     const body = lines.join('\n');
 
+    // The confirmation itself is transactional (like a receipt) — always sent
+    // regardless of notificationPreferences, same as before. Push is new and
+    // opt-in by nature (needs a registered device token), so it's the one
+    // channel here that does check consent.
     await this.notificationsService.send(NotificationChannel.SMS, {
       to: dto.phone,
       body,
@@ -413,6 +451,105 @@ export class BookingService {
         body,
       });
     }
+
+    if (patient.notificationPreferences.push && patient.fcmTokens.length > 0) {
+      await Promise.allSettled(
+        patient.fcmTokens.map((token) =>
+          this.notificationsService.send(NotificationChannel.PUSH, {
+            to: token,
+            subject: clinic.name,
+            body,
+          }),
+        ),
+      );
+    }
+  }
+
+  /** Notifies the assigned doctor of a new online booking, per their own channel preferences. */
+  private async notifyAssignedDoctor(
+    clinic: ClinicEntity,
+    doctor: DoctorProfileEntity,
+    dto: CreateBookingDto,
+    service: ServiceEntity,
+  ): Promise<void> {
+    const { user } = doctor;
+    const prefs = user.notificationPreferences;
+    const patientName = `${dto.firstName} ${dto.lastName}`;
+    const subject = 'Новая онлайн-запись';
+    const body = `${patientName} записался(-ась) на «${service.name}» ${dto.date} в ${dto.time}.`;
+
+    const sends: Promise<void>[] = [];
+
+    if ((prefs?.email ?? true) && user.email) {
+      sends.push(
+        this.notificationsService.send(NotificationChannel.EMAIL, {
+          to: user.email,
+          subject,
+          body,
+        }),
+      );
+    }
+
+    if ((prefs?.whatsapp ?? true) && user.phone) {
+      sends.push(
+        this.notificationsService.send(NotificationChannel.WHATSAPP, {
+          to: user.phone,
+          body,
+        }),
+      );
+    }
+
+    if (prefs?.push ?? true) {
+      sends.push(
+        ...user.fcmTokens.map((token) =>
+          this.notificationsService.send(NotificationChannel.PUSH, {
+            to: token,
+            subject,
+            body,
+          }),
+        ),
+      );
+    }
+
+    if (prefs?.inApp ?? true) {
+      sends.push(
+        this.notificationsService.send(NotificationChannel.IN_APP, {
+          to: user.id,
+          subject,
+          body,
+          clinicId: clinic.id,
+        }),
+      );
+    }
+
+    await Promise.allSettled(sends);
+  }
+
+  /** Registers a push-notification device token from the booking widget for an existing patient. */
+  async registerPushToken(
+    clinicId: string,
+    patientId: string,
+    token: string,
+  ): Promise<void> {
+    const patient = await this.patientsRepository.findOne({
+      where: { id: patientId, clinicId },
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+
+    if (patient.fcmTokens.includes(token)) {
+      return;
+    }
+
+    await this.patientsRepository.update(patient.id, {
+      fcmTokens: [...patient.fcmTokens, token],
+      notificationPreferences: {
+        ...patient.notificationPreferences,
+        push: true,
+      },
+    });
   }
 
   private toServiceDto(service: ServiceEntity): BookingServiceDto {

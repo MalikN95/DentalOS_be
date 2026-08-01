@@ -138,6 +138,9 @@ export class StaffService {
         role: dto.role,
         isActive: dto.isActive ?? true,
         mfaEnabled: false,
+        ...(dto.notificationPreferences
+          ? { notificationPreferences: dto.notificationPreferences }
+          : {}),
       }),
     );
 
@@ -187,6 +190,10 @@ export class StaffService {
 
     if (dto.password) {
       patch.passwordHash = await bcryptHash(dto.password, BCRYPT_ROUNDS);
+    }
+
+    if (dto.notificationPreferences !== undefined) {
+      patch.notificationPreferences = dto.notificationPreferences;
     }
 
     const losesOwnership =
@@ -455,6 +462,7 @@ export class StaffService {
       mfaEnabled: user.mfaEnabled,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      notificationPreferences: user.notificationPreferences,
       doctorProfile: profile ? this.toDoctorProfile(profile) : null,
     };
   }

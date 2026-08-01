@@ -8,6 +8,7 @@ import {
   ManyToOne,
 } from 'typeorm';
 import { Gender } from '../common/enums/gender.enum';
+import type { PatientNotificationPreferences } from '../common/types/notification-preferences.type';
 import { BaseEntity } from './base.entity';
 import { ClinicEntity } from './clinic.entity';
 import { PatientTagEntity } from './patient-tag.entity';
@@ -70,6 +71,16 @@ export class PatientEntity extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({
+    type: 'jsonb',
+    default: () => '\'{"email":true,"whatsapp":true,"push":true}\'',
+  })
+  notificationPreferences: PatientNotificationPreferences;
+
+  // Web push (FCM) device tokens registered from the booking widget.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  fcmTokens: string[];
 
   @ManyToMany(() => PatientTagEntity)
   @JoinTable({

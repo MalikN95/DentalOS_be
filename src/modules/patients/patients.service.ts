@@ -152,7 +152,20 @@ export class PatientsService {
   }
 
   create(clinicId: string, dto: CreatePatientDto): Promise<PatientEntity> {
-    const patient = this.patientsRepository.create({ ...dto, clinicId });
+    const patient = this.patientsRepository.create({
+      ...dto,
+      clinicId,
+      // `push` can only ever be granted from the patient's own browser — never
+      // set from this staff-facing form, so it always defaults true here.
+      ...(dto.notificationPreferences
+        ? {
+            notificationPreferences: {
+              push: true,
+              ...dto.notificationPreferences,
+            },
+          }
+        : {}),
+    });
     return this.patientsRepository.save(patient);
   }
 
@@ -162,7 +175,18 @@ export class PatientsService {
     dto: UpdatePatientDto,
   ): Promise<PatientEntity> {
     const patient = await this.findOne(clinicId, id);
-    this.patientsRepository.merge(patient, dto);
+    const { notificationPreferences, ...rest } = dto;
+    this.patientsRepository.merge(patient, rest);
+
+    // Deep-merge so this staff-facing form (email/whatsapp only) can never
+    // wipe out a `push` consent the patient granted from the booking widget.
+    if (notificationPreferences) {
+      patient.notificationPreferences = {
+        ...patient.notificationPreferences,
+        ...notificationPreferences,
+      };
+    }
+
     return this.patientsRepository.save(patient);
   }
 

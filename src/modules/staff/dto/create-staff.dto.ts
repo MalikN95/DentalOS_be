@@ -11,6 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { StaffNotificationPreferencesDto } from '../../../common/dto/notification-preferences.dto';
 import { UserRole } from '../../../common/enums/user-role.enum';
 import { STAFF_ROLES } from '../staff.types';
 import { StaffDoctorDto } from './staff-doctor.dto';
@@ -65,4 +66,10 @@ export class CreateStaffDto {
   @ValidateNested()
   @Type(() => StaffDoctorDto)
   doctor?: StaffDoctorDto;
+
+  @ApiPropertyOptional({ type: StaffNotificationPreferencesDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StaffNotificationPreferencesDto)
+  notificationPreferences?: StaffNotificationPreferencesDto;
 }

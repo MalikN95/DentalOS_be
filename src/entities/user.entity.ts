@@ -1,5 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { UserRole } from '../common/enums/user-role.enum';
+import type { StaffNotificationPreferences } from '../common/types/notification-preferences.type';
 import { BaseEntity } from './base.entity';
 import { ClinicEntity } from './clinic.entity';
 
@@ -52,4 +53,15 @@ export class UserEntity extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({
+    type: 'jsonb',
+    default: () =>
+      '\'{"email":true,"whatsapp":true,"push":true,"inApp":true}\'',
+  })
+  notificationPreferences: StaffNotificationPreferences;
+
+  // Web push (FCM) device tokens — a user may be logged in on several browsers/devices.
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  fcmTokens: string[];
 }

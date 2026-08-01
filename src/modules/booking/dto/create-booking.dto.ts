@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -7,7 +9,20 @@ import {
   IsUUID,
   Matches,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+
+// Only email/whatsapp — push consent is registered separately, after the
+// patient grants browser permission (see POST /booking/:clinicSlug/push-subscription).
+export class BookingNotificationPreferencesDto {
+  @ApiProperty()
+  @IsBoolean()
+  email: boolean;
+
+  @ApiProperty()
+  @IsBoolean()
+  whatsapp: boolean;
+}
 
 export class CreateBookingDto {
   @ApiProperty({ format: 'uuid' })
@@ -66,4 +81,10 @@ export class CreateBookingDto {
   @IsString()
   @MaxLength(500)
   comment?: string;
+
+  @ApiPropertyOptional({ type: BookingNotificationPreferencesDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BookingNotificationPreferencesDto)
+  notificationPreferences?: BookingNotificationPreferencesDto;
 }

@@ -22,6 +22,7 @@ import { BookingDoctorsQueryDto } from './dto/booking-doctors-query.dto';
 import { BookingServiceCategoryDto } from './dto/booking-service-category.dto';
 import { BookingSlotsQueryDto } from './dto/booking-slots-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { RegisterBookingPushTokenDto } from './dto/register-booking-push-token.dto';
 
 @ApiTags('booking')
 @Controller('booking/:clinicSlug')
@@ -119,5 +120,19 @@ export class BookingController {
     @Body() dto: CreateBookingDto,
   ): Promise<BookingConfirmationDto> {
     return this.bookingService.createBooking(clinic, dto);
+  }
+
+  @Public()
+  @Post('push-subscription')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  registerPushToken(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Body() dto: RegisterBookingPushTokenDto,
+  ): Promise<void> {
+    return this.bookingService.registerPushToken(
+      clinic.id,
+      dto.patientId,
+      dto.token,
+    );
   }
 }

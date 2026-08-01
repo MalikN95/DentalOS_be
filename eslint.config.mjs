@@ -76,7 +76,10 @@ export default tseslint.config(
   },
   {
     // global fetch/Response are stable in Node 20+, but eslint-plugin-n flags them until v21
-    files: ['src/modules/auth/id-token.verifier.ts'],
+    files: [
+      'src/modules/auth/id-token.verifier.ts',
+      'src/modules/notifications/senders/whatsapp.sender.ts',
+    ],
     rules: {
       'n/no-unsupported-features/node-builtins': 'off',
     },

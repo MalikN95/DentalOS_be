@@ -103,6 +103,19 @@ export class ReminderProcessorService
       return;
     }
 
+    if (!this.hasConsent(reminder.channel, appointment)) {
+      await this.remindersRepository.update(reminder.id, {
+        status: ReminderStatus.CANCELLED,
+        error: 'patient opted out of this channel',
+      });
+      return;
+    }
+
+    if (reminder.channel === NotificationChannel.PUSH) {
+      await this.processPush(reminder, appointment);
+      return;
+    }
+
     const to = this.resolveDestination(reminder.channel, appointment);
 
     if (!to) {
@@ -131,6 +144,70 @@ export class ReminderProcessorService
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  // Push fans out to every device token the patient has registered from the
+  // booking widget, instead of a single `to` destination like the other channels.
+  private async processPush(
+    reminder: ReminderEntity,
+    appointment: AppointmentEntity,
+  ): Promise<void> {
+    const tokens = appointment.patient.fcmTokens;
+
+    if (tokens.length === 0) {
+      await this.remindersRepository.update(reminder.id, {
+        status: ReminderStatus.FAILED,
+        error: 'no destination',
+      });
+      return;
+    }
+
+    try {
+      const body = this.buildMessage(appointment);
+      await Promise.all(
+        tokens.map((token) =>
+          this.notificationsService.send(NotificationChannel.PUSH, {
+            to: token,
+            subject: 'Напоминание о приёме',
+            body,
+          }),
+        ),
+      );
+
+      await this.remindersRepository.update(reminder.id, {
+        status: ReminderStatus.SENT,
+        sentAt: new Date(),
+        error: null,
+      });
+    } catch (error) {
+      await this.remindersRepository.update(reminder.id, {
+        status: ReminderStatus.FAILED,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // Only EMAIL/WHATSAPP/PUSH are exposed as opt-outs on the patient card;
+  // every other channel (SMS, Telegram) is unaffected and always allowed, as before.
+  private hasConsent(
+    channel: NotificationChannel,
+    appointment: AppointmentEntity,
+  ): boolean {
+    const prefs = appointment.patient.notificationPreferences;
+
+    if (channel === NotificationChannel.EMAIL) {
+      return prefs?.email ?? true;
+    }
+
+    if (channel === NotificationChannel.WHATSAPP) {
+      return prefs?.whatsapp ?? true;
+    }
+
+    if (channel === NotificationChannel.PUSH) {
+      return prefs?.push ?? true;
+    }
+
+    return true;
   }
 
   private resolveDestination(

@@ -278,16 +278,19 @@ export class ReviewsService {
   ): Promise<void> {
     const body = `Пожалуйста, оцените ваш приём. Код для отзыва: ${token}`;
     const { patient } = appointment;
+    const prefs = patient.notificationPreferences;
 
-    if (patient.phone) {
-      await this.notificationsService.send(NotificationChannel.SMS, {
+    const wantsWhatsapp = prefs?.whatsapp ?? true;
+    const wantsEmail = prefs?.email ?? true;
+
+    if (wantsWhatsapp && patient.phone) {
+      await this.notificationsService.send(NotificationChannel.WHATSAPP, {
         to: patient.phone,
         body,
       });
-      return;
     }
 
-    if (patient.email) {
+    if (wantsEmail && patient.email) {
       await this.notificationsService.send(NotificationChannel.EMAIL, {
         to: patient.email,
         subject: 'Оцените ваш приём',
