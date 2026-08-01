@@ -10,7 +10,7 @@ Dental Practice Management System (DPMS) API.
 - S3 (AWS SDK v3, any S3-compatible storage) — presigned upload/download
 - Swagger — `/api/docs`
 - JWT access + refresh tokens with rotation (single-use refresh, jti stored in DB)
-- Multi-tenancy: clinic resolved from subdomain (`{clinic}.APP_DOMAIN`), `clinicId` in every entity and in JWT payload
+- Multi-tenancy: no per-clinic subdomain — clinic resolved from the JWT (`clinicId`) once authenticated, or from a `:clinicSlug` path param for the public booking widget; `clinicId` in every entity and in the JWT payload
 - Audit log for medical data changes
 - Health checks (`/api/health`, Terminus) + graceful shutdown
 
@@ -105,15 +105,19 @@ src/
 
 ## Multi-tenancy
 
-- Each clinic has a unique `subdomain` (`ClinicEntity.subdomain`), users open `{subdomain}.APP_DOMAIN`.
-- `TenantMiddleware` resolves the clinic from the `Host` header on every request and attaches it to the request. In dev (`APP_DOMAIN=localhost`) pass the `X-Clinic-Subdomain: <subdomain>` header instead.
-- Login is scoped to the resolved clinic: the same email may exist in different clinics.
-- The issued JWT contains `clinicId`. The global `TenantGuard` rejects requests where the token's `clinicId` does not match the clinic resolved from the subdomain (403).
+There is no per-clinic subdomain — every clinic's staff/owner/admin logs into the same single kabinet host, and each clinic has a unique `slug` (`ClinicEntity.slug`, renamed from the old `subdomain` column) used only as a path segment for the public booking widget (`/api/booking/:clinicSlug/...`).
+
+- The global `TenantGuard` (`common/guards/tenant.guard.ts`) resolves `request.clinic` — the only thing `@CurrentClinic()` reads — one of two ways:
+  - **Authenticated requests**: from the JWT's `clinicId` (`clinicsService.findById`). No header, no URL segment needed.
+  - **Public requests with a `:clinicSlug` route param** (the booking widget): from `clinicsService.findBySlug(slug)`.
+  - Everything else (e.g. `POST /auth/login`, before a user is known) leaves `request.clinic` unresolved; `@CurrentClinic()` throws if a controller tries to use it anyway.
+- Login has no clinic context at all: `POST /api/auth/login` takes just `{ email, password }`. Staff/owner/admin email is enforced **globally unique** (partial unique index `UQ_users_email_non_patient` on `users.email` **where** `role != 'patient'`), so the account — and its clinic — is resolved from the email alone. Patient accounts (booking-widget social login) stay clinic-scoped via the pre-existing `(clinicId, email)` composite unique index — the same person may legitimately have separate patient records at unrelated clinics.
+- `StaffService` enforces the same global uniqueness at the application layer (`assertEmailFreeElsewhere`) so a conflict returns a clean `409` instead of a raw DB constraint error.
 - Use `@CurrentClinic()` in controllers to get the resolved `ClinicEntity`.
 
 ## Auth flow
 
-1. `POST /api/auth/login` (on the clinic's subdomain) → `{ accessToken, refreshToken }`
+1. `POST /api/auth/login` (email + password, no clinic context) → `{ accessToken, refreshToken }`
 2. Access token (15m) in `Authorization: Bearer <token>`
 3. `POST /api/auth/refresh` with refresh token → new pair; old refresh token is invalidated (rotation, reuse detection)
 4. `POST /api/auth/logout` revokes the refresh token
