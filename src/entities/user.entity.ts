@@ -5,6 +5,13 @@ import { ClinicEntity } from './clinic.entity';
 
 @Entity('users')
 @Index(['clinicId', 'email'], { unique: true })
+// Staff/owner/admin login is a single global kabinet with no clinic context,
+// so those emails must be unique system-wide. Patients stay clinic-scoped
+// (the same person may have separate booking-widget accounts per clinic).
+@Index('UQ_users_email_non_patient', ['email'], {
+  unique: true,
+  where: `"role" != 'patient'`,
+})
 export class UserEntity extends BaseEntity {
   @Column('uuid')
   clinicId: string;

@@ -16,9 +16,9 @@ export class ClinicsService {
     private readonly storageService: StorageService,
   ) {}
 
-  findBySubdomain(subdomain: string): Promise<ClinicEntity | null> {
+  findBySlug(slug: string): Promise<ClinicEntity | null> {
     return this.clinicsRepository.findOne({
-      where: { subdomain: subdomain.toLowerCase(), isActive: true },
+      where: { slug: slug.toLowerCase(), isActive: true },
     });
   }
 

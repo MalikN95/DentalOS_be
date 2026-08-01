@@ -38,8 +38,10 @@ const runSeed = async (): Promise<void> => {
     // eslint-disable-next-line no-console -- seed CLI output
     console.log(`Staff password: ${config.staffPassword}`);
     // eslint-disable-next-line no-console -- seed CLI output
+    console.log('Login: http://app.localhost:3000/login');
+    // eslint-disable-next-line no-console -- seed CLI output
     console.log(
-      `Subdomain: ${config.clinicSubdomain} → http://${config.clinicSubdomain}.localhost:3000/login`,
+      `Booking widget: http://app.localhost:3000/book/${config.clinicSlug}`,
     );
   } finally {
     await dataSource.destroy();

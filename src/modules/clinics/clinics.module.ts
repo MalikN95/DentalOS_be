@@ -6,7 +6,6 @@ import { ClinicEntity } from '../../entities/clinic.entity';
 import { EquipmentEntity } from '../../entities/equipment.entity';
 import { ClinicsController } from './clinics.controller';
 import { ClinicsService } from './clinics.service';
-import { TenantMiddleware } from './tenant.middleware';
 
 @Module({
   imports: [
@@ -18,7 +17,7 @@ import { TenantMiddleware } from './tenant.middleware';
     ]),
   ],
   controllers: [ClinicsController],
-  providers: [ClinicsService, TenantMiddleware],
+  providers: [ClinicsService],
   exports: [TypeOrmModule, ClinicsService],
 })
 export class ClinicsModule {}

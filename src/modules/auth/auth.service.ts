@@ -22,15 +22,8 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  async login(
-    clinicId: string,
-    email: string,
-    password: string,
-  ): Promise<LoginResponseDto> {
-    const user = await this.usersService.findByEmailWithPassword(
-      clinicId,
-      email,
-    );
+  async login(email: string, password: string): Promise<LoginResponseDto> {
+    const user = await this.usersService.findStaffByEmailWithPassword(email);
 
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');

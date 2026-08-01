@@ -26,15 +26,14 @@ export class UsersService {
     private readonly usersRepository: Repository<UserEntity>,
   ) {}
 
-  findByEmailWithPassword(
-    clinicId: string,
-    email: string,
-  ): Promise<UserEntity | null> {
+  // Staff/owner/admin login has no clinic context — email alone resolves the
+  // account (enforced globally unique for non-patient roles at the DB level).
+  findStaffByEmailWithPassword(email: string): Promise<UserEntity | null> {
     return this.usersRepository
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
-      .where('user.clinicId = :clinicId', { clinicId })
-      .andWhere('user.email = :email', { email })
+      .where('user.email = :email', { email })
+      .andWhere('user.role != :patient', { patient: UserRole.PATIENT })
       .andWhere('user.isActive = true')
       .getOne();
   }

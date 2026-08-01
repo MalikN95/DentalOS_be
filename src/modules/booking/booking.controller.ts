@@ -24,7 +24,7 @@ import { BookingSlotsQueryDto } from './dto/booking-slots-query.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
 @ApiTags('booking')
-@Controller('booking')
+@Controller('booking/:clinicSlug')
 export class BookingController {
   constructor(
     private readonly bookingService: BookingService,

@@ -1,9 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentClinic } from '../../common/decorators/current-clinic.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { ClinicEntity } from '../../entities/clinic.entity';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -19,11 +17,8 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: LoginResponseDto })
-  login(
-    @CurrentClinic() clinic: ClinicEntity,
-    @Body() dto: LoginDto,
-  ): Promise<LoginResponseDto> {
-    return this.authService.login(clinic.id, dto.email, dto.password);
+  login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
+    return this.authService.login(dto.email, dto.password);
   }
 
   @Public()

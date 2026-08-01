@@ -3,7 +3,7 @@ import { ClinicEntity } from '../../entities/clinic.entity';
 import { getSeedConfig } from './seed.config';
 
 /**
- * Finds the seed clinic by subdomain or creates it. Idempotent.
+ * Finds the seed clinic by slug or creates it. Idempotent.
  * Shared by every seeder so they all target the same tenant.
  */
 export const ensureClinic = async (
@@ -13,7 +13,7 @@ export const ensureClinic = async (
   const clinicRepository = dataSource.getRepository(ClinicEntity);
 
   const existing = await clinicRepository.findOne({
-    where: { subdomain: config.clinicSubdomain },
+    where: { slug: config.clinicSlug },
   });
 
   if (existing) {
@@ -23,7 +23,7 @@ export const ensureClinic = async (
   const clinic = await clinicRepository.save(
     clinicRepository.create({
       name: config.clinicName,
-      subdomain: config.clinicSubdomain,
+      slug: config.clinicSlug,
       timezone: 'Europe/Moscow',
       currency: 'RUB',
       language: 'ru',
@@ -32,7 +32,7 @@ export const ensureClinic = async (
   );
 
   // eslint-disable-next-line no-console -- seed output
-  console.log(`Created clinic "${clinic.name}" (${clinic.subdomain})`);
+  console.log(`Created clinic "${clinic.name}" (${clinic.slug})`);
 
   return clinic;
 };

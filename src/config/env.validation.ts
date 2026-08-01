@@ -6,8 +6,6 @@ export const envValidationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().port().default(4000),
   CORS_ORIGIN: Joi.string().uri().required(),
-  // Root domain for tenant subdomains: {clinic}.APP_DOMAIN
-  APP_DOMAIN: Joi.string().hostname().required(),
 
   POSTGRES_HOST: Joi.string().required(),
   POSTGRES_PORT: Joi.number().port().default(5432),

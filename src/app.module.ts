@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,7 +15,6 @@ import { BookingModule } from './modules/booking/booking.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CabinetsModule } from './modules/cabinets/cabinets.module';
 import { ClinicsModule } from './modules/clinics/clinics.module';
-import { TenantMiddleware } from './modules/clinics/tenant.middleware';
 import { CrmModule } from './modules/crm/crm.module';
 import { DentalChartModule } from './modules/dental-chart/dental-chart.module';
 import { DoctorsModule } from './modules/doctors/doctors.module';
@@ -86,8 +85,4 @@ import { UsersModule } from './modules/users/users.module';
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(TenantMiddleware).forRoutes('{*splat}');
-  }
-}
+export class AppModule {}

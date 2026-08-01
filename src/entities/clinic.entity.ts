@@ -7,9 +7,9 @@ export class ClinicEntity extends BaseEntity {
   @Column()
   name: string;
 
-  // Tenant resolution: {subdomain}.dentalos.com
+  // URL-safe identifier for the public booking widget: app.dentalos.com/book/{slug}
   @Column({ unique: true })
-  subdomain: string;
+  slug: string;
 
   // S3 object key, download via presigned URL
   @Column({ nullable: true, type: 'varchar' })

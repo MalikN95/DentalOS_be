@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash as bcryptHash } from 'bcrypt';
-import { Brackets, In, Repository } from 'typeorm';
+import { Brackets, In, Not, Repository } from 'typeorm';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { BranchEntity } from '../../entities/branch.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
@@ -108,6 +108,8 @@ export class StaffService {
   async create(clinicId: string, dto: CreateStaffDto): Promise<StaffMember> {
     const email = dto.email.trim().toLowerCase();
     const passwordHash = await bcryptHash(dto.password, BCRYPT_ROUNDS);
+
+    await this.assertEmailFreeElsewhere(clinicId, email);
 
     // The (clinicId, email) unique index also covers soft-deleted rows,
     // so a previously removed employee is restored instead of re-inserted.
@@ -252,6 +254,8 @@ export class StaffService {
     clinicId: string,
     email: string,
   ): Promise<void> {
+    await this.assertEmailFreeElsewhere(clinicId, email);
+
     const taken = await this.usersRepository.findOne({
       where: { clinicId, email },
       withDeleted: true,
@@ -259,6 +263,24 @@ export class StaffService {
 
     if (taken) {
       throw new ConflictException('Employee with this email already exists');
+    }
+  }
+
+  // Staff login has no clinic context (single global kabinet), so the email
+  // must be free across every OTHER clinic too — not just this one.
+  private async assertEmailFreeElsewhere(
+    clinicId: string,
+    email: string,
+  ): Promise<void> {
+    const takenElsewhere = await this.usersRepository.findOne({
+      where: { email, role: Not(UserRole.PATIENT), clinicId: Not(clinicId) },
+      withDeleted: true,
+    });
+
+    if (takenElsewhere) {
+      throw new ConflictException(
+        'An employee with this email already exists in another clinic',
+      );
     }
   }
 

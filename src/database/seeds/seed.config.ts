@@ -1,5 +1,5 @@
 export interface SeedConfig {
-  clinicSubdomain: string;
+  clinicSlug: string;
   clinicName: string;
   adminEmail: string;
   adminPassword: string;
@@ -9,7 +9,7 @@ export interface SeedConfig {
 }
 
 export const getSeedConfig = (): SeedConfig => ({
-  clinicSubdomain: process.env.SEED_CLINIC_SUBDOMAIN ?? 'maximum',
+  clinicSlug: process.env.SEED_CLINIC_SLUG ?? 'maximum',
   clinicName: process.env.SEED_CLINIC_NAME ?? 'Maximum Dental',
   adminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@maximum.local',
   adminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'Admin12345',

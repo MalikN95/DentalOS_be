@@ -11,9 +11,7 @@ export const CurrentClinic = createParamDecorator(
     const request = ctx.switchToHttp().getRequest<RequestWithTenant>();
 
     if (!request.clinic) {
-      throw new BadRequestException(
-        'Clinic could not be resolved from subdomain',
-      );
+      throw new BadRequestException('Clinic could not be resolved');
     }
 
     return request.clinic;
