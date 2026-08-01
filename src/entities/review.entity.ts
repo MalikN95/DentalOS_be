@@ -60,4 +60,12 @@ export class ReviewEntity extends BaseEntity {
   // One-time token in the post-visit review link
   @Column({ type: 'varchar', nullable: true, unique: true })
   requestToken: string | null;
+
+  // Curated for prominent display on the public landing page (a subset of published reviews)
+  @Column({ default: false })
+  featured: boolean;
+
+  // Curated for display on the public online-booking widget, under the doctor's card
+  @Column({ default: false })
+  showInBooking: boolean;
 }

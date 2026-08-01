@@ -19,6 +19,7 @@ import { LeadEntity, LeadStage } from '../../entities/lead.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderSettingEntity } from '../../entities/reminder-setting.entity';
 import { ReminderEntity, ReminderStatus } from '../../entities/reminder.entity';
+import { ReviewEntity } from '../../entities/review.entity';
 import { ServiceCategoryEntity } from '../../entities/service-category.entity';
 import { ServiceEntity } from '../../entities/service.entity';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -52,6 +53,8 @@ export class BookingService {
     private readonly serviceRepository: Repository<ServiceEntity>,
     @InjectRepository(DoctorProfileEntity)
     private readonly doctorRepository: Repository<DoctorProfileEntity>,
+    @InjectRepository(ReviewEntity)
+    private readonly reviewRepository: Repository<ReviewEntity>,
     private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
     private readonly notificationsService: NotificationsService,
@@ -151,19 +154,65 @@ export class BookingService {
       .addOrderBy('user.firstName', 'ASC')
       .getMany();
 
+    const ratingsByDoctor = await this.getRatingSummaries(
+      doctors.map((doctor) => doctor.id),
+    );
+
     return Promise.all(
-      doctors.map(async (doctor) => ({
-        id: doctor.id,
-        branchId: doctor.branchId as string,
-        firstName: doctor.user.firstName,
-        lastName: doctor.user.lastName,
-        photoUrl: doctor.photoKey
-          ? await this.storageService.getDownloadUrl(doctor.photoKey)
-          : null,
-        specializations: doctor.specializations,
-        experienceYears: doctor.experienceYears,
-        description: doctor.description,
-      })),
+      doctors.map(async (doctor) => {
+        const summary = ratingsByDoctor.get(doctor.id);
+
+        return {
+          id: doctor.id,
+          branchId: doctor.branchId as string,
+          firstName: doctor.user.firstName,
+          lastName: doctor.user.lastName,
+          photoUrl: doctor.photoKey
+            ? await this.storageService.getDownloadUrl(doctor.photoKey)
+            : null,
+          specializations: doctor.specializations,
+          experienceYears: doctor.experienceYears,
+          description: doctor.description,
+          averageRating: summary ? summary.averageRating : null,
+          reviewCount: summary ? summary.reviewCount : 0,
+        };
+      }),
+    );
+  }
+
+  /** Only reviews explicitly curated for the booking widget (`showInBooking`) count here. */
+  private async getRatingSummaries(
+    doctorProfileIds: string[],
+  ): Promise<Map<string, { averageRating: number; reviewCount: number }>> {
+    if (doctorProfileIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.reviewRepository
+      .createQueryBuilder('review')
+      .select('review.doctorProfileId', 'doctorProfileId')
+      .addSelect('AVG(review.rating)', 'averageRating')
+      .addSelect('COUNT(review.id)', 'reviewCount')
+      .where('review.doctorProfileId IN (:...doctorProfileIds)', {
+        doctorProfileIds,
+      })
+      .andWhere('review.showInBooking = true')
+      .andWhere('review.rating > 0')
+      .groupBy('review.doctorProfileId')
+      .getRawMany<{
+        doctorProfileId: string;
+        averageRating: string;
+        reviewCount: string;
+      }>();
+
+    return new Map(
+      rows.map((row) => [
+        row.doctorProfileId,
+        {
+          averageRating: Math.round(Number(row.averageRating) * 10) / 10,
+          reviewCount: Number(row.reviewCount),
+        },
+      ]),
     );
   }
 

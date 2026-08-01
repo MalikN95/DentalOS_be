@@ -20,6 +20,8 @@ import { ReviewEntity } from '../../entities/review.entity';
 import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { UpdateReviewFeaturedDto } from './dto/update-review-featured.dto';
+import { UpdateReviewShowInBookingDto } from './dto/update-review-show-in-booking.dto';
 import { UpdateReviewStatusDto } from './dto/update-review-status.dto';
 import { ReviewsService } from './reviews.service';
 import {
@@ -69,6 +71,28 @@ export class ReviewsController {
     @Body() dto: UpdateReviewStatusDto,
   ): Promise<ReviewEntity> {
     return this.reviewsService.updateStatus(clinic.id, id, dto);
+  }
+
+  @Patch(':id/featured')
+  @ApiBearerAuth()
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  updateFeatured(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateReviewFeaturedDto,
+  ): Promise<ReviewEntity> {
+    return this.reviewsService.updateFeatured(clinic.id, id, dto);
+  }
+
+  @Patch(':id/show-in-booking')
+  @ApiBearerAuth()
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  updateShowInBooking(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateReviewShowInBookingDto,
+  ): Promise<ReviewEntity> {
+    return this.reviewsService.updateShowInBooking(clinic.id, id, dto);
   }
 
   @Public()

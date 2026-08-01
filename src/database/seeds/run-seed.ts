@@ -8,6 +8,7 @@ import { seedInvoices } from './seed-invoices';
 import { seedLeads } from './seed-leads';
 import { seedPatients } from './seed-patients';
 import { seedRandomPatients } from './seed-random-patients';
+import { seedReviews } from './seed-reviews';
 import { seedServices } from './seed-services';
 import { seedStaff } from './seed-staff';
 
@@ -28,6 +29,7 @@ const runSeed = async (): Promise<void> => {
     await seedCabinets(dataSource);
     await seedAppointments(dataSource);
     await seedInvoices(dataSource);
+    await seedReviews(dataSource);
     await seedLeads(dataSource);
     // eslint-disable-next-line no-console -- seed CLI output
     console.log('Seed completed.');

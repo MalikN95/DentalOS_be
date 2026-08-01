@@ -26,4 +26,10 @@ export class BookingDoctorDto {
 
   @ApiProperty({ type: String, nullable: true })
   description: string | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  averageRating: number | null;
+
+  @ApiProperty()
+  reviewCount: number;
 }

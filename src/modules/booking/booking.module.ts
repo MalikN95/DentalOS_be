@@ -10,6 +10,7 @@ import { LeadEntity } from '../../entities/lead.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderSettingEntity } from '../../entities/reminder-setting.entity';
 import { ReminderEntity } from '../../entities/reminder.entity';
+import { ReviewEntity } from '../../entities/review.entity';
 import { ScheduleExceptionEntity } from '../../entities/schedule-exception.entity';
 import { ServiceCategoryEntity } from '../../entities/service-category.entity';
 import { ServiceEntity } from '../../entities/service.entity';
@@ -34,6 +35,7 @@ import { BookingService } from './booking.service';
       ReminderSettingEntity,
       ReminderEntity,
       LeadEntity,
+      ReviewEntity,
     ]),
     NotificationsModule,
   ],

@@ -15,6 +15,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { UpdateReviewFeaturedDto } from './dto/update-review-featured.dto';
+import { UpdateReviewShowInBookingDto } from './dto/update-review-show-in-booking.dto';
 import { UpdateReviewStatusDto } from './dto/update-review-status.dto';
 import {
   PaginatedResult,
@@ -101,7 +103,8 @@ export class ReviewsService {
 
     review.rating = dto.rating;
     review.comment = dto.comment ?? null;
-    review.status = ReviewStatus.PENDING;
+    // Rated reviews are visible to staff immediately — no manual moderation step.
+    review.status = ReviewStatus.PUBLISHED;
     review.requestToken = null;
 
     await this.reviewsRepository.save(review);
@@ -113,7 +116,15 @@ export class ReviewsService {
     clinicId: string,
     query: ListReviewsQueryDto,
   ): Promise<PaginatedResult<ReviewEntity>> {
-    const { page, limit, status, doctorProfileId } = query;
+    const {
+      page,
+      limit,
+      status,
+      doctorProfileId,
+      patientId,
+      featured,
+      showInBooking,
+    } = query;
 
     const where: FindOptionsWhere<ReviewEntity> = { clinicId };
 
@@ -123,6 +134,18 @@ export class ReviewsService {
 
     if (doctorProfileId !== undefined) {
       where.doctorProfileId = doctorProfileId;
+    }
+
+    if (patientId !== undefined) {
+      where.patientId = patientId;
+    }
+
+    if (featured !== undefined) {
+      where.featured = featured;
+    }
+
+    if (showInBooking !== undefined) {
+      where.showInBooking = showInBooking;
     }
 
     const [items, total] = await this.reviewsRepository.findAndCount({
@@ -158,6 +181,57 @@ export class ReviewsService {
     }
 
     review.status = dto.status;
+
+    // Only published reviews are eligible to be featured/shown in booking — unpublishing drops both.
+    if (dto.status !== ReviewStatus.PUBLISHED) {
+      review.featured = false;
+      review.showInBooking = false;
+    }
+
+    return this.reviewsRepository.save(review);
+  }
+
+  async updateFeatured(
+    clinicId: string,
+    id: string,
+    dto: UpdateReviewFeaturedDto,
+  ): Promise<ReviewEntity> {
+    const review = await this.reviewsRepository.findOne({
+      where: { id, clinicId },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    if (dto.featured && review.rating === NOT_RATED) {
+      throw new BadRequestException('Only rated reviews can be featured');
+    }
+
+    review.featured = dto.featured;
+    return this.reviewsRepository.save(review);
+  }
+
+  async updateShowInBooking(
+    clinicId: string,
+    id: string,
+    dto: UpdateReviewShowInBookingDto,
+  ): Promise<ReviewEntity> {
+    const review = await this.reviewsRepository.findOne({
+      where: { id, clinicId },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    if (dto.showInBooking && review.rating === NOT_RATED) {
+      throw new BadRequestException(
+        'Only rated reviews can be shown in online booking',
+      );
+    }
+
+    review.showInBooking = dto.showInBooking;
     return this.reviewsRepository.save(review);
   }
 
@@ -172,6 +246,7 @@ export class ReviewsService {
         clinicId,
         status: ReviewStatus.PUBLISHED,
         rating: MoreThan(NOT_RATED),
+        featured: true,
       },
       relations: { patient: true },
       order: { createdAt: 'DESC' },
