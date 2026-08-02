@@ -7,7 +7,7 @@ export class ClinicEntity extends BaseEntity {
   @Column()
   name: string;
 
-  // URL-safe identifier for the public booking widget: app.dentalos.com/book/{slug}
+  // URL-safe identifier for the public booking widget: dentalos.com/book/{slug}
   @Column({ unique: true })
   slug: string;
 
