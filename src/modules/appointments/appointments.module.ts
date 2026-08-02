@@ -9,6 +9,7 @@ import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderEntity } from '../../entities/reminder.entity';
 import { ScheduleExceptionEntity } from '../../entities/schedule-exception.entity';
 import { ServiceEntity } from '../../entities/service.entity';
+import { UserEntity } from '../../entities/user.entity';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
 
@@ -24,6 +25,7 @@ import { AppointmentsService } from './appointments.service';
       ReminderEntity,
       DoctorScheduleEntity,
       ScheduleExceptionEntity,
+      UserEntity,
     ]),
   ],
   controllers: [AppointmentsController],

@@ -12,6 +12,7 @@ import {
 import { InvoiceEntity, InvoiceStatus } from '../../entities/invoice.entity';
 import { PaymentEntity, PaymentMethod } from '../../entities/payment.entity';
 import { RefundEntity } from '../../entities/refund.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
@@ -31,66 +32,84 @@ export class PaymentsService {
     private readonly paymentsRepository: Repository<PaymentEntity>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
-  create(
+  async create(
     clinicId: string,
     userId: string,
     dto: CreatePaymentDto,
   ): Promise<PaymentEntity> {
-    return this.dataSource.transaction(async (manager) => {
-      const invoice = await manager.findOne(InvoiceEntity, {
-        where: { id: dto.invoiceId, clinicId },
-      });
-      if (!invoice) {
-        throw new NotFoundException('Invoice not found');
-      }
-      if (
-        invoice.status !== InvoiceStatus.PENDING &&
-        invoice.status !== InvoiceStatus.PARTIALLY_PAID
-      ) {
-        throw new BadRequestException('Invoice is not payable');
-      }
+    const { payment, invoice, patient } = await this.dataSource.transaction(
+      async (manager) => {
+        const paymentInvoice = await manager.findOne(InvoiceEntity, {
+          where: { id: dto.invoiceId, clinicId },
+          relations: { patient: true },
+        });
+        if (!paymentInvoice) {
+          throw new NotFoundException('Invoice not found');
+        }
+        if (
+          paymentInvoice.status !== InvoiceStatus.PENDING &&
+          paymentInvoice.status !== InvoiceStatus.PARTIALLY_PAID
+        ) {
+          throw new BadRequestException('Invoice is not payable');
+        }
 
-      const amount = toMoney(dto.amount);
-      let giftCertificateId: string | null = null;
+        const amount = toMoney(dto.amount);
+        let giftCertificateId: string | null = null;
 
-      if (dto.method === PaymentMethod.GIFT_CERTIFICATE) {
-        giftCertificateId = await this.chargeGiftCertificate(
-          manager.getRepository(GiftCertificateEntity),
-          clinicId,
-          dto.giftCertificateId,
-          amount,
+        if (dto.method === PaymentMethod.GIFT_CERTIFICATE) {
+          giftCertificateId = await this.chargeGiftCertificate(
+            manager.getRepository(GiftCertificateEntity),
+            clinicId,
+            dto.giftCertificateId,
+            amount,
+          );
+        }
+
+        const createdPayment = await manager.save(
+          manager.create(PaymentEntity, {
+            invoiceId: paymentInvoice.id,
+            method: dto.method,
+            amount,
+            giftCertificateId,
+            receiptNumber: dto.receiptNumber ?? null,
+            receivedById: userId,
+          }),
         );
-      }
 
-      const payment = await manager.save(
-        manager.create(PaymentEntity, {
-          invoiceId: invoice.id,
-          method: dto.method,
-          amount,
-          giftCertificateId,
-          receiptNumber: dto.receiptNumber ?? null,
-          receivedById: userId,
-        }),
-      );
+        const payments = await manager.find(PaymentEntity, {
+          where: { invoiceId: paymentInvoice.id },
+        });
+        const totalPaid = payments.reduce(
+          (sum, item) => moneyAdd(sum, item.amount),
+          '0.00',
+        );
 
-      const payments = await manager.find(PaymentEntity, {
-        where: { invoiceId: invoice.id },
-      });
-      const totalPaid = payments.reduce(
-        (sum, item) => moneyAdd(sum, item.amount),
-        '0.00',
-      );
+        paymentInvoice.status =
+          Number(totalPaid) >= Number(paymentInvoice.total)
+            ? InvoiceStatus.PAID
+            : InvoiceStatus.PARTIALLY_PAID;
+        await manager.save(paymentInvoice);
 
-      invoice.status =
-        Number(totalPaid) >= Number(invoice.total)
-          ? InvoiceStatus.PAID
-          : InvoiceStatus.PARTIALLY_PAID;
-      await manager.save(invoice);
+        return {
+          payment: createdPayment,
+          invoice: paymentInvoice,
+          patient: paymentInvoice.patient,
+        };
+      },
+    );
 
-      return payment;
+    await this.notificationsService.notifyPatient(patient, {
+      subject: 'Оплата получена',
+      body:
+        invoice.status === InvoiceStatus.PAID
+          ? `Оплата по счёту №${invoice.number} получена в полном объёме. Спасибо!`
+          : `Получена частичная оплата по счёту №${invoice.number}.`,
     });
+
+    return payment;
   }
 
   async list(

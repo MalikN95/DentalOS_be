@@ -14,6 +14,7 @@ import { ReviewEntity } from '../../entities/review.entity';
 import { ScheduleExceptionEntity } from '../../entities/schedule-exception.entity';
 import { ServiceCategoryEntity } from '../../entities/service-category.entity';
 import { ServiceEntity } from '../../entities/service.entity';
+import { UserEntity } from '../../entities/user.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AvailabilityService } from './availability.service';
 import { BookingController } from './booking.controller';
@@ -36,6 +37,7 @@ import { BookingService } from './booking.service';
       ReminderEntity,
       LeadEntity,
       ReviewEntity,
+      UserEntity,
     ]),
     NotificationsModule,
   ],

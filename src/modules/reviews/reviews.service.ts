@@ -9,8 +9,11 @@ import { randomUUID } from 'node:crypto';
 import { FindOptionsWhere, MoreThan, Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
+import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import { AppointmentEntity } from '../../entities/appointment.entity';
+import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { ReviewEntity, ReviewStatus } from '../../entities/review.entity';
+import { UserEntity } from '../../entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
@@ -39,6 +42,10 @@ export class ReviewsService {
     private readonly reviewsRepository: Repository<ReviewEntity>,
     @InjectRepository(AppointmentEntity)
     private readonly appointmentsRepository: Repository<AppointmentEntity>,
+    @InjectRepository(DoctorProfileEntity)
+    private readonly doctorProfilesRepository: Repository<DoctorProfileEntity>,
+    @InjectRepository(UserEntity)
+    private readonly usersRepository: Repository<UserEntity>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -91,6 +98,7 @@ export class ReviewsService {
   async submit(dto: SubmitReviewDto): Promise<SubmitReviewResult> {
     const review = await this.reviewsRepository.findOne({
       where: { requestToken: dto.token },
+      relations: { patient: true },
     });
 
     if (!review) {
@@ -109,7 +117,54 @@ export class ReviewsService {
 
     await this.reviewsRepository.save(review);
 
+    await this.notifyNewReview(review);
+
     return { success: true };
+  }
+
+  private async notifyNewReview(review: ReviewEntity): Promise<void> {
+    const patientName = `${review.patient.firstName} ${review.patient.lastName}`;
+    const stars = '★'.repeat(review.rating);
+    const commentSuffix = review.comment ? `: «${review.comment}»` : '.';
+
+    const doctorProfile = await this.doctorProfilesRepository.findOne({
+      where: { id: review.doctorProfileId },
+      relations: { user: true },
+    });
+
+    const sends: Promise<void>[] = [];
+
+    if (doctorProfile) {
+      sends.push(
+        this.notificationsService.notifyStaffMember(doctorProfile.user, {
+          subject: 'Новый отзыв',
+          body: `${patientName} оставил(-а) отзыв ${stars}${commentSuffix}`,
+        }),
+      );
+    }
+
+    sends.push(
+      (async () => {
+        const admins = await findClinicAdmins(
+          this.usersRepository,
+          review.clinicId,
+        );
+        const interested = admins.filter(
+          (admin) =>
+            review.rating <= admin.notificationPreferences.reviewAlertMaxRating,
+        );
+        await this.notificationsService.notifyStaffMembers(interested, {
+          subject: 'Новый отзыв',
+          body: `${patientName}${
+            doctorProfile
+              ? ` о враче ${doctorProfile.user.firstName} ${doctorProfile.user.lastName}`
+              : ''
+          } оставил(-а) отзыв ${stars}${commentSuffix}`,
+        });
+      })(),
+    );
+
+    await Promise.allSettled(sends);
   }
 
   async findAll(

@@ -21,6 +21,7 @@ import { PatientEntity } from '../../entities/patient.entity';
 import { PaymentEntity } from '../../entities/payment.entity';
 import { PromoCodeEntity } from '../../entities/promo-code.entity';
 import { ServiceEntity } from '../../entities/service.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CreateInvoiceDto,
   InvoiceItemInputDto,
@@ -50,6 +51,7 @@ export class InvoicesService {
     private readonly paymentsRepository: Repository<PaymentEntity>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async list(
@@ -107,57 +109,71 @@ export class InvoicesService {
     return Object.assign(invoice, { payments });
   }
 
-  create(clinicId: string, dto: CreateInvoiceDto): Promise<InvoiceEntity> {
+  async create(
+    clinicId: string,
+    dto: CreateInvoiceDto,
+  ): Promise<InvoiceEntity> {
     if (dto.discountId && dto.promoCode) {
       throw new BadRequestException(
         'Provide either discountId or promoCode, not both',
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const patient = await manager.findOne(PatientEntity, {
-        where: { id: dto.patientId, clinicId },
-      });
-      if (!patient) {
-        throw new NotFoundException('Patient not found');
-      }
-
-      if (dto.appointmentId) {
-        const appointment = await manager.findOne(AppointmentEntity, {
-          where: { id: dto.appointmentId, clinicId },
+    const { invoice, patient } = await this.dataSource.transaction(
+      async (manager) => {
+        const invoicePatient = await manager.findOne(PatientEntity, {
+          where: { id: dto.patientId, clinicId },
         });
-        if (!appointment) {
-          throw new NotFoundException('Appointment not found');
+        if (!invoicePatient) {
+          throw new NotFoundException('Patient not found');
         }
-      }
 
-      const items = await this.buildItems(manager, clinicId, dto.items);
-      const subtotal = items.reduce(
-        (sum, item) => moneyAdd(sum, item.amount),
-        '0.00',
-      );
+        if (dto.appointmentId) {
+          const appointment = await manager.findOne(AppointmentEntity, {
+            where: { id: dto.appointmentId, clinicId },
+          });
+          if (!appointment) {
+            throw new NotFoundException('Appointment not found');
+          }
+        }
 
-      const { discountAmount, discountId, promoCodeId } =
-        await this.resolveDiscount(manager, clinicId, dto, subtotal);
+        const items = await this.buildItems(manager, clinicId, dto.items);
+        const subtotal = items.reduce(
+          (sum, item) => moneyAdd(sum, item.amount),
+          '0.00',
+        );
 
-      const total = moneySub(subtotal, discountAmount);
+        const { discountAmount, discountId, promoCodeId } =
+          await this.resolveDiscount(manager, clinicId, dto, subtotal);
 
-      const invoice = manager.create(InvoiceEntity, {
-        clinicId,
-        patientId: dto.patientId,
-        appointmentId: dto.appointmentId ?? null,
-        number: await this.generateNumber(manager, clinicId),
-        status: InvoiceStatus.PENDING,
-        subtotal,
-        discountAmount,
-        total,
-        discountId,
-        promoCodeId,
-        items,
-      });
+        const total = moneySub(subtotal, discountAmount);
 
-      return manager.save(invoice);
+        const createdInvoice = manager.create(InvoiceEntity, {
+          clinicId,
+          patientId: dto.patientId,
+          appointmentId: dto.appointmentId ?? null,
+          number: await this.generateNumber(manager, clinicId),
+          status: InvoiceStatus.PENDING,
+          subtotal,
+          discountAmount,
+          total,
+          discountId,
+          promoCodeId,
+          items,
+        });
+
+        const saved = await manager.save(createdInvoice);
+
+        return { invoice: saved, patient: invoicePatient };
+      },
+    );
+
+    await this.notificationsService.notifyPatient(patient, {
+      subject: 'Выставлен счёт',
+      body: `Вам выставлен счёт №${invoice.number} на сумму ${invoice.total}.`,
     });
+
+    return invoice;
   }
 
   async cancel(clinicId: string, id: string): Promise<InvoiceEntity> {

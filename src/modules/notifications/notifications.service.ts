@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { NotificationEntity } from '../../entities/notification.entity';
+import { PatientEntity } from '../../entities/patient.entity';
 import { UserEntity } from '../../entities/user.entity';
 import { NotificationListDto } from './dto/notification.dto';
 import {
@@ -10,6 +11,11 @@ import {
   NotificationMessage,
   NotificationSender,
 } from './notification-sender.interface';
+
+export interface NotifyMessage {
+  subject?: string;
+  body: string;
+}
 
 @Injectable()
 export class NotificationsService {
@@ -46,6 +52,94 @@ export class NotificationsService {
     message: NotificationMessage,
   ): Promise<void> {
     await Promise.all(channels.map((channel) => this.send(channel, message)));
+  }
+
+  /** Notifies a staff member on every channel they've enabled (email/whatsapp/push/inApp). */
+  async notifyStaffMember(
+    user: UserEntity,
+    message: NotifyMessage,
+  ): Promise<void> {
+    const prefs = user.notificationPreferences;
+    const sends: Promise<void>[] = [];
+
+    if (prefs.email && user.email) {
+      sends.push(
+        this.send(NotificationChannel.EMAIL, { to: user.email, ...message }),
+      );
+    }
+
+    if (prefs.whatsapp && user.phone) {
+      sends.push(
+        this.send(NotificationChannel.WHATSAPP, {
+          to: user.phone,
+          body: message.body,
+        }),
+      );
+    }
+
+    if (prefs.push) {
+      sends.push(
+        ...user.fcmTokens.map((token) =>
+          this.send(NotificationChannel.PUSH, { to: token, ...message }),
+        ),
+      );
+    }
+
+    if (prefs.inApp) {
+      sends.push(
+        this.send(NotificationChannel.IN_APP, {
+          to: user.id,
+          ...message,
+          clinicId: user.clinicId,
+        }),
+      );
+    }
+
+    await Promise.allSettled(sends);
+  }
+
+  /** Notifies every staff member in the list — see notifyStaffMember(). */
+  async notifyStaffMembers(
+    users: UserEntity[],
+    message: NotifyMessage,
+  ): Promise<void> {
+    await Promise.allSettled(
+      users.map((user) => this.notifyStaffMember(user, message)),
+    );
+  }
+
+  /** Notifies a patient on every channel they've enabled (email/whatsapp/push). */
+  async notifyPatient(
+    patient: PatientEntity,
+    message: NotifyMessage,
+  ): Promise<void> {
+    const prefs = patient.notificationPreferences;
+    const sends: Promise<void>[] = [];
+
+    if (prefs.email && patient.email) {
+      sends.push(
+        this.send(NotificationChannel.EMAIL, { to: patient.email, ...message }),
+      );
+    }
+
+    if (prefs.whatsapp && patient.phone) {
+      sends.push(
+        this.send(NotificationChannel.WHATSAPP, {
+          to: patient.phone,
+          body: message.body,
+        }),
+      );
+    }
+
+    if (prefs.push) {
+      sends.push(
+        ...patient.fcmTokens.map((token) =>
+          this.send(NotificationChannel.PUSH, { to: token, ...message }),
+        ),
+      );
+    }
+
+    await Promise.allSettled(sends);
   }
 
   async listForUser(

@@ -12,6 +12,7 @@ import {
   Repository,
 } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
+import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-own-doctor-profile-id.helper';
 import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import {
@@ -26,6 +27,8 @@ import { PatientEntity } from '../../entities/patient.entity';
 import { ReminderEntity, ReminderStatus } from '../../entities/reminder.entity';
 import { ScheduleExceptionEntity } from '../../entities/schedule-exception.entity';
 import { ServiceEntity } from '../../entities/service.entity';
+import { UserEntity } from '../../entities/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { QueryAppointmentsDto } from './dto/query-appointments.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
@@ -90,6 +93,9 @@ export class AppointmentsService {
     private readonly doctorSchedulesRepository: Repository<DoctorScheduleEntity>,
     @InjectRepository(ScheduleExceptionEntity)
     private readonly scheduleExceptionsRepository: Repository<ScheduleExceptionEntity>,
+    @InjectRepository(UserEntity)
+    private readonly usersRepository: Repository<UserEntity>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findMany(
@@ -300,6 +306,8 @@ export class AppointmentsService {
       appointment.id,
     );
 
+    const previousStartsAt = appointment.startsAt;
+
     appointment.doctorProfileId = doctorProfileId;
     appointment.cabinetId = cabinetId;
     appointment.branchId = branchId;
@@ -308,7 +316,10 @@ export class AppointmentsService {
 
     await this.saveAppointment(appointment);
 
-    return this.findOne(clinicId, id);
+    const updated = await this.findOne(clinicId, id);
+    await this.notifyRescheduled(updated, previousStartsAt);
+
+    return updated;
   }
 
   async updateStatus(
@@ -330,6 +341,7 @@ export class AppointmentsService {
       );
     }
 
+    const previousStatus = appointment.status;
     appointment.status = dto.status;
 
     if (dto.status === AppointmentStatus.CANCELLED) {
@@ -342,7 +354,88 @@ export class AppointmentsService {
 
     await this.appointmentsRepository.save(appointment);
 
-    return this.findOne(clinicId, id);
+    const updated = await this.findOne(clinicId, id);
+    await this.notifyStatusChange(clinicId, updated, previousStatus);
+
+    return updated;
+  }
+
+  private formatDateTime(date: Date): string {
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  private async notifyStatusChange(
+    clinicId: string,
+    appointment: AppointmentEntity,
+    previousStatus: AppointmentStatus,
+  ): Promise<void> {
+    if (appointment.status === previousStatus) {
+      return;
+    }
+
+    const { patient, doctorProfile, service } = appointment;
+    const doctorName = `${doctorProfile.user.firstName} ${doctorProfile.user.lastName}`;
+    const patientName = `${patient.firstName} ${patient.lastName}`;
+    const when = this.formatDateTime(appointment.startsAt);
+
+    if (appointment.status === AppointmentStatus.ARRIVED) {
+      await this.notificationsService.notifyStaffMember(doctorProfile.user, {
+        subject: 'Пациент пришёл',
+        body: `${patientName} пришёл(-ла) на приём (${service.name}, ${when}).`,
+      });
+      return;
+    }
+
+    if (appointment.status === AppointmentStatus.CANCELLED) {
+      await Promise.allSettled([
+        this.notificationsService.notifyPatient(patient, {
+          subject: 'Приём отменён',
+          body: `Ваш приём ${when} (${service.name}) отменён.`,
+        }),
+        this.notificationsService.notifyStaffMember(doctorProfile.user, {
+          subject: 'Приём отменён',
+          body: `Приём с ${patientName} ${when} (${service.name}) отменён.`,
+        }),
+        (async () => {
+          const admins = await findClinicAdmins(this.usersRepository, clinicId);
+          await this.notificationsService.notifyStaffMembers(admins, {
+            subject: 'Запись отменена',
+            body: `Отменена запись: ${patientName} к ${doctorName}, ${when} (${service.name}).`,
+          });
+        })(),
+      ]);
+    }
+  }
+
+  private async notifyRescheduled(
+    appointment: AppointmentEntity,
+    previousStartsAt: Date,
+  ): Promise<void> {
+    if (previousStartsAt.getTime() === appointment.startsAt.getTime()) {
+      return;
+    }
+
+    const { patient, doctorProfile, service } = appointment;
+    const patientName = `${patient.firstName} ${patient.lastName}`;
+    const previousWhen = this.formatDateTime(previousStartsAt);
+    const nextWhen = this.formatDateTime(appointment.startsAt);
+
+    await Promise.allSettled([
+      this.notificationsService.notifyPatient(patient, {
+        subject: 'Время приёма изменено',
+        body: `Время вашего приёма (${service.name}) перенесено: ${previousWhen} → ${nextWhen}.`,
+      }),
+      this.notificationsService.notifyStaffMember(doctorProfile.user, {
+        subject: 'Время приёма изменено',
+        body: `Приём с ${patientName} (${service.name}) перенесён: ${previousWhen} → ${nextWhen}.`,
+      }),
+    ]);
   }
 
   async update(

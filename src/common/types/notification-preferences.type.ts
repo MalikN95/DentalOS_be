@@ -21,6 +21,11 @@ export interface StaffNotificationPreferences {
   whatsapp: boolean;
   push: boolean;
   inApp: boolean;
+  // Owner/admin only: get a "new review" alert only for ratings AT OR BELOW
+  // this value (1-5). Keeps the alert focused on reviews that need attention
+  // instead of every single 5-star one. Doctors always get notified of every
+  // review about them, unfiltered — this field is ignored for their role.
+  reviewAlertMaxRating: number;
 }
 
 export const DEFAULT_STAFF_NOTIFICATION_PREFERENCES: StaffNotificationPreferences =
@@ -29,4 +34,5 @@ export const DEFAULT_STAFF_NOTIFICATION_PREFERENCES: StaffNotificationPreference
     whatsapp: true,
     push: true,
     inApp: true,
+    reviewAlertMaxRating: 3,
   };

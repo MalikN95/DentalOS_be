@@ -57,7 +57,7 @@ export class UserEntity extends BaseEntity {
   @Column({
     type: 'jsonb',
     default: () =>
-      '\'{"email":true,"whatsapp":true,"push":true,"inApp":true}\'',
+      '\'{"email":true,"whatsapp":true,"push":true,"inApp":true,"reviewAlertMaxRating":3}\'',
   })
   notificationPreferences: StaffNotificationPreferences;
 

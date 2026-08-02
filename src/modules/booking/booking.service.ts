@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
+import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import {
   AppointmentEntity,
   AppointmentSource,
@@ -22,6 +23,7 @@ import { ReminderEntity, ReminderStatus } from '../../entities/reminder.entity';
 import { ReviewEntity } from '../../entities/review.entity';
 import { ServiceCategoryEntity } from '../../entities/service-category.entity';
 import { ServiceEntity } from '../../entities/service.entity';
+import { UserEntity } from '../../entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import {
@@ -57,6 +59,8 @@ export class BookingService {
     private readonly reviewRepository: Repository<ReviewEntity>,
     @InjectRepository(PatientEntity)
     private readonly patientsRepository: Repository<PatientEntity>,
+    @InjectRepository(UserEntity)
+    private readonly usersRepository: Repository<UserEntity>,
     private readonly dataSource: DataSource,
     private readonly availabilityService: AvailabilityService,
     private readonly notificationsService: NotificationsService,
@@ -368,6 +372,7 @@ export class BookingService {
       patient,
     );
     await this.notifyAssignedDoctor(clinic, doctor, dto, service);
+    await this.notifyClinicAdmins(clinic, doctor, dto, service);
 
     return {
       appointmentId: appointment.id,
@@ -523,6 +528,22 @@ export class BookingService {
     }
 
     await Promise.allSettled(sends);
+  }
+
+  private async notifyClinicAdmins(
+    clinic: ClinicEntity,
+    doctor: DoctorProfileEntity,
+    dto: CreateBookingDto,
+    service: ServiceEntity,
+  ): Promise<void> {
+    const admins = await findClinicAdmins(this.usersRepository, clinic.id);
+    const patientName = `${dto.firstName} ${dto.lastName}`;
+    const doctorName = `${doctor.user.firstName} ${doctor.user.lastName}`;
+
+    await this.notificationsService.notifyStaffMembers(admins, {
+      subject: 'Новая онлайн-запись',
+      body: `${patientName} записался(-ась) к ${doctorName} на «${service.name}» ${dto.date} в ${dto.time}.`,
+    });
   }
 
   /** Registers a push-notification device token from the booking widget for an existing patient. */

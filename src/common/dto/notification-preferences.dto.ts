@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
 import {
   PatientNotificationPreferences,
   StaffNotificationPreferences,
@@ -39,4 +39,10 @@ export class StaffNotificationPreferencesDto implements StaffNotificationPrefere
   @ApiProperty()
   @IsBoolean()
   inApp: boolean;
+
+  @ApiProperty({ minimum: 1, maximum: 5 })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  reviewAlertMaxRating: number;
 }

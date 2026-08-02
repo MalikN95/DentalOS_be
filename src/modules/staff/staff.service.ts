@@ -8,10 +8,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { hash as bcryptHash } from 'bcrypt';
 import { Brackets, In, Not, Repository } from 'typeorm';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import { BranchEntity } from '../../entities/branch.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { ServiceEntity } from '../../entities/service.entity';
 import { UserEntity } from '../../entities/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { ListStaffQueryDto } from './dto/list-staff-query.dto';
 import { StaffDoctorDto } from './dto/staff-doctor.dto';
@@ -36,6 +38,7 @@ export class StaffService {
     private readonly branchesRepository: Repository<BranchEntity>,
     @InjectRepository(ServiceEntity)
     private readonly servicesRepository: Repository<ServiceEntity>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(
@@ -202,7 +205,10 @@ export class StaffService {
         patch.isActive === false);
 
     if (losesOwnership) {
-      await this.assertNotLastOwner(clinicId);
+      await this.assertNotLastOwner(
+        clinicId,
+        `изменить роль или деактивировать владельца ${user.firstName} ${user.lastName}`,
+      );
     }
 
     if (Object.keys(patch).length > 0) {
@@ -235,7 +241,10 @@ export class StaffService {
     const user = await this.getStaffUser(clinicId, id);
 
     if (user.role === UserRole.OWNER) {
-      await this.assertNotLastOwner(clinicId);
+      await this.assertNotLastOwner(
+        clinicId,
+        `удалить владельца ${user.firstName} ${user.lastName}`,
+      );
     }
 
     await this.removeDoctorProfile(clinicId, user.id);
@@ -292,12 +301,21 @@ export class StaffService {
   }
 
   /** Guards the clinic against losing its last active owner. */
-  private async assertNotLastOwner(clinicId: string): Promise<void> {
+  private async assertNotLastOwner(
+    clinicId: string,
+    action: string,
+  ): Promise<void> {
     const owners = await this.usersRepository.count({
       where: { clinicId, role: UserRole.OWNER, isActive: true },
     });
 
     if (owners <= 1) {
+      const admins = await findClinicAdmins(this.usersRepository, clinicId);
+      await this.notificationsService.notifyStaffMembers(admins, {
+        subject: 'Попытка удалить последнего владельца',
+        body: `Кто-то попытался ${action} — клиника осталась бы без активного владельца. Действие заблокировано.`,
+      });
+
       throw new BadRequestException(
         'Clinic must keep at least one active owner',
       );
