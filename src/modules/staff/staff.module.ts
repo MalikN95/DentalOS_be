@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BranchEntity } from '../../entities/branch.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { ServiceEntity } from '../../entities/service.entity';
 import { UserEntity } from '../../entities/user.entity';
@@ -14,6 +15,7 @@ import { StaffService } from './staff.service';
       DoctorProfileEntity,
       BranchEntity,
       ServiceEntity,
+      ClinicEntity,
     ]),
   ],
   controllers: [StaffController],

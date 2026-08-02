@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentClinic } from '../../common/decorators/current-clinic.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ClinicEntity } from '../../entities/clinic.entity';
@@ -33,9 +34,10 @@ export class EmailsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   send(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser('sub') userId: string,
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @Body() dto: SendPatientEmailDto,
   ): Promise<void> {
-    return this.emailsService.sendToPatient(clinic, patientId, dto);
+    return this.emailsService.sendToPatient(clinic, patientId, dto, userId);
   }
 }

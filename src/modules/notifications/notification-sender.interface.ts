@@ -7,6 +7,8 @@ export interface NotificationMessage {
   body: string;
   // Required by the in-app sender (to satisfy NotificationEntity.clinicId); ignored by every other channel.
   clinicId?: string;
+  // Used by the email sender as the "From" display name; ignored by every other channel.
+  clinicName?: string;
 }
 
 export interface NotificationSender {

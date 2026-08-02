@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppointmentEntity } from '../../entities/appointment.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DiscountEntity } from '../../entities/discount.entity';
 import { GiftCertificateEntity } from '../../entities/gift-certificate.entity';
 import { InvoiceItemEntity } from '../../entities/invoice-item.entity';
@@ -32,6 +33,7 @@ import { PaymentsService } from './payments.service';
       PatientEntity,
       ServiceEntity,
       AppointmentEntity,
+      ClinicEntity,
     ]),
   ],
   controllers: [

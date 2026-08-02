@@ -13,6 +13,9 @@ export interface MailMessage {
   subject: string;
   text: string;
   html: string;
+  // Overrides the default SMTP_FROM_NAME with the clinic's own name, e.g.
+  // for a patient/staff-facing notification. Falls back when blank/omitted.
+  fromName?: string;
 }
 
 export interface PatientEmailMessage extends PatientEmailTemplateProps {
@@ -44,7 +47,7 @@ export class MailService implements OnModuleDestroy {
 
   async send(message: MailMessage): Promise<void> {
     await this.transporter.sendMail({
-      from: `"${this.fromName}" <${this.fromEmail}>`,
+      from: `"${message.fromName || this.fromName}" <${this.fromEmail}>`,
       to: message.to,
       subject: message.subject,
       text: message.text,
@@ -69,7 +72,7 @@ export class MailService implements OnModuleDestroy {
     ]);
 
     await this.transporter.sendMail({
-      from: `"${this.fromName}" <${this.fromEmail}>`,
+      from: `"${message.clinicName || this.fromName}" <${this.fromEmail}>`,
       to: message.to,
       subject: message.subject,
       text,

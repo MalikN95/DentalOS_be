@@ -17,6 +17,7 @@ export class MailSender implements NotificationSender {
       subject: message.subject ?? '',
       text: message.body,
       html: textToHtml(message.body),
+      fromName: message.clinicName,
     });
   }
 }

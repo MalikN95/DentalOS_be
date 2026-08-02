@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { NotificationEntity } from '../../entities/notification.entity';
 import { UserEntity } from '../../entities/user.entity';
+import { ChatModule } from '../chat/chat.module';
 import { MailModule } from '../mail/mail.module';
 import { MailService } from '../mail/mail.service';
 import {
@@ -43,6 +44,7 @@ const createSenders = (
 @Module({
   imports: [
     MailModule,
+    ChatModule,
     TypeOrmModule.forFeature([NotificationEntity, UserEntity]),
   ],
   controllers: [NotificationsController],

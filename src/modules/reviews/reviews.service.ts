@@ -10,7 +10,14 @@ import { FindOptionsWhere, MoreThan, Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
+import {
+  newReviewAdminCopy,
+  newReviewDoctorCopy,
+  reviewRequestCopy,
+} from '../../common/notifications/notification-copy';
+import { resolveClinicNotificationContext } from '../../common/notifications/notification-locale';
 import { AppointmentEntity } from '../../entities/appointment.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { ReviewEntity, ReviewStatus } from '../../entities/review.entity';
 import { UserEntity } from '../../entities/user.entity';
@@ -46,6 +53,8 @@ export class ReviewsService {
     private readonly doctorProfilesRepository: Repository<DoctorProfileEntity>,
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
+    @InjectRepository(ClinicEntity)
+    private readonly clinicsRepository: Repository<ClinicEntity>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -90,7 +99,7 @@ export class ReviewsService {
       }),
     );
 
-    await this.sendReviewRequest(appointment, token);
+    await this.sendReviewRequest(clinicId, appointment, token);
 
     return { reviewId: review.id, token };
   }
@@ -125,20 +134,30 @@ export class ReviewsService {
   private async notifyNewReview(review: ReviewEntity): Promise<void> {
     const patientName = `${review.patient.firstName} ${review.patient.lastName}`;
     const stars = '★'.repeat(review.rating);
-    const commentSuffix = review.comment ? `: «${review.comment}»` : '.';
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      review.clinicId,
+    );
 
     const doctorProfile = await this.doctorProfilesRepository.findOne({
       where: { id: review.doctorProfileId },
       relations: { user: true },
     });
+    const doctorName = doctorProfile
+      ? `${doctorProfile.user.firstName} ${doctorProfile.user.lastName}`
+      : null;
 
     const sends: Promise<void>[] = [];
 
     if (doctorProfile) {
       sends.push(
         this.notificationsService.notifyStaffMember(doctorProfile.user, {
-          subject: 'Новый отзыв',
-          body: `${patientName} оставил(-а) отзыв ${stars}${commentSuffix}`,
+          ...newReviewDoctorCopy(locale, {
+            patientName,
+            stars,
+            comment: review.comment,
+          }),
+          clinicName,
         }),
       );
     }
@@ -154,12 +173,13 @@ export class ReviewsService {
             review.rating <= admin.notificationPreferences.reviewAlertMaxRating,
         );
         await this.notificationsService.notifyStaffMembers(interested, {
-          subject: 'Новый отзыв',
-          body: `${patientName}${
-            doctorProfile
-              ? ` о враче ${doctorProfile.user.firstName} ${doctorProfile.user.lastName}`
-              : ''
-          } оставил(-а) отзыв ${stars}${commentSuffix}`,
+          ...newReviewAdminCopy(locale, {
+            patientName,
+            doctorName,
+            stars,
+            comment: review.comment,
+          }),
+          clinicName,
         });
       })(),
     );
@@ -328,10 +348,15 @@ export class ReviewsService {
   }
 
   private async sendReviewRequest(
+    clinicId: string,
     appointment: AppointmentEntity,
     token: string,
   ): Promise<void> {
-    const body = `Пожалуйста, оцените ваш приём. Код для отзыва: ${token}`;
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      clinicId,
+    );
+    const { subject, body } = reviewRequestCopy(locale, { token });
     const { patient } = appointment;
     const prefs = patient.notificationPreferences;
 
@@ -348,8 +373,9 @@ export class ReviewsService {
     if (wantsEmail && patient.email) {
       await this.notificationsService.send(NotificationChannel.EMAIL, {
         to: patient.email,
-        subject: 'Оцените ваш приём',
+        subject,
         body,
+        clinicName,
       });
     }
   }

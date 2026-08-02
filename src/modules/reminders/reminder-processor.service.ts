@@ -8,7 +8,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
+import { appointmentReminderCopy } from '../../common/notifications/notification-copy';
+import {
+  NOTIFICATION_LOCALE_INTL_TAG,
+  resolveClinicNotificationContext,
+} from '../../common/notifications/notification-locale';
 import { AppointmentEntity } from '../../entities/appointment.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { ReminderEntity, ReminderStatus } from '../../entities/reminder.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -39,6 +45,8 @@ export class ReminderProcessorService
   constructor(
     @InjectRepository(ReminderEntity)
     private readonly remindersRepository: Repository<ReminderEntity>,
+    @InjectRepository(ClinicEntity)
+    private readonly clinicsRepository: Repository<ClinicEntity>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -129,8 +137,7 @@ export class ReminderProcessorService
     try {
       await this.notificationsService.send(reminder.channel, {
         to,
-        subject: 'Напоминание о приёме',
-        body: this.buildMessage(appointment),
+        ...(await this.buildReminderCopy(appointment)),
       });
 
       await this.remindersRepository.update(reminder.id, {
@@ -163,13 +170,12 @@ export class ReminderProcessorService
     }
 
     try {
-      const body = this.buildMessage(appointment);
+      const copy = await this.buildReminderCopy(appointment);
       await Promise.all(
         tokens.map((token) =>
           this.notificationsService.send(NotificationChannel.PUSH, {
             to: token,
-            subject: 'Напоминание о приёме',
-            body,
+            ...copy,
           }),
         ),
       );
@@ -225,17 +231,33 @@ export class ReminderProcessorService
     return null;
   }
 
-  private buildMessage(appointment: AppointmentEntity): string {
-    const dateTime = appointment.startsAt.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  private async buildReminderCopy(
+    appointment: AppointmentEntity,
+  ): Promise<{ subject: string; body: string; clinicName: string }> {
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      appointment.clinicId,
+    );
+    const when = appointment.startsAt.toLocaleString(
+      NOTIFICATION_LOCALE_INTL_TAG[locale],
+      {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      },
+    );
     const doctor = appointment.doctorProfile.user;
     const doctorName = `${doctor.firstName} ${doctor.lastName}`;
 
-    return `Напоминание о приёме ${dateTime}, услуга ${appointment.service.name}, врач ${doctorName}`;
+    return {
+      ...appointmentReminderCopy(locale, {
+        when,
+        serviceName: appointment.service.name,
+        doctorName,
+      }),
+      clinicName,
+    };
   }
 }

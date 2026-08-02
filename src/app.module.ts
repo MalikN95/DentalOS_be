@@ -14,6 +14,7 @@ import { JwtAccessGuard } from './modules/auth/guards/jwt-access.guard';
 import { BookingModule } from './modules/booking/booking.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CabinetsModule } from './modules/cabinets/cabinets.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { ClinicsModule } from './modules/clinics/clinics.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { DentalChartModule } from './modules/dental-chart/dental-chart.module';
@@ -77,6 +78,7 @@ import { UsersModule } from './modules/users/users.module';
     ReviewsModule,
     RemindersModule,
     EquipmentModule,
+    ChatModule,
     SeedModule,
   ],
   providers: [

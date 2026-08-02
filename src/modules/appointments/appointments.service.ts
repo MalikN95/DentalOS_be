@@ -14,6 +14,19 @@ import {
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-own-doctor-profile-id.helper';
+import {
+  appointmentArrivedCopy,
+  appointmentCancelledAdminCopy,
+  appointmentCancelledDoctorCopy,
+  appointmentCancelledPatientCopy,
+  appointmentRescheduledDoctorCopy,
+  appointmentRescheduledPatientCopy,
+} from '../../common/notifications/notification-copy';
+import {
+  NOTIFICATION_LOCALE_INTL_TAG,
+  resolveClinicNotificationContext,
+  type NotificationLocale,
+} from '../../common/notifications/notification-locale';
 import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import {
   AppointmentEntity,
@@ -21,6 +34,7 @@ import {
 } from '../../entities/appointment.entity';
 import { BranchEntity } from '../../entities/branch.entity';
 import { CabinetEntity } from '../../entities/cabinet.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { DoctorScheduleEntity } from '../../entities/doctor-schedule.entity';
 import { PatientEntity } from '../../entities/patient.entity';
@@ -95,6 +109,8 @@ export class AppointmentsService {
     private readonly scheduleExceptionsRepository: Repository<ScheduleExceptionEntity>,
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
+    @InjectRepository(ClinicEntity)
+    private readonly clinicsRepository: Repository<ClinicEntity>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -317,7 +333,7 @@ export class AppointmentsService {
     await this.saveAppointment(appointment);
 
     const updated = await this.findOne(clinicId, id);
-    await this.notifyRescheduled(updated, previousStartsAt);
+    await this.notifyRescheduled(clinicId, updated, previousStartsAt);
 
     return updated;
   }
@@ -360,8 +376,8 @@ export class AppointmentsService {
     return updated;
   }
 
-  private formatDateTime(date: Date): string {
-    return date.toLocaleString('ru-RU', {
+  private formatDateTime(date: Date, locale: NotificationLocale): string {
+    return date.toLocaleString(NOTIFICATION_LOCALE_INTL_TAG[locale], {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -382,12 +398,20 @@ export class AppointmentsService {
     const { patient, doctorProfile, service } = appointment;
     const doctorName = `${doctorProfile.user.firstName} ${doctorProfile.user.lastName}`;
     const patientName = `${patient.firstName} ${patient.lastName}`;
-    const when = this.formatDateTime(appointment.startsAt);
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      clinicId,
+    );
+    const when = this.formatDateTime(appointment.startsAt, locale);
 
     if (appointment.status === AppointmentStatus.ARRIVED) {
       await this.notificationsService.notifyStaffMember(doctorProfile.user, {
-        subject: 'Пациент пришёл',
-        body: `${patientName} пришёл(-ла) на приём (${service.name}, ${when}).`,
+        ...appointmentArrivedCopy(locale, {
+          patientName,
+          serviceName: service.name,
+          when,
+        }),
+        clinicName,
       });
       return;
     }
@@ -395,18 +419,30 @@ export class AppointmentsService {
     if (appointment.status === AppointmentStatus.CANCELLED) {
       await Promise.allSettled([
         this.notificationsService.notifyPatient(patient, {
-          subject: 'Приём отменён',
-          body: `Ваш приём ${when} (${service.name}) отменён.`,
+          ...appointmentCancelledPatientCopy(locale, {
+            serviceName: service.name,
+            when,
+          }),
+          clinicName,
         }),
         this.notificationsService.notifyStaffMember(doctorProfile.user, {
-          subject: 'Приём отменён',
-          body: `Приём с ${patientName} ${when} (${service.name}) отменён.`,
+          ...appointmentCancelledDoctorCopy(locale, {
+            patientName,
+            serviceName: service.name,
+            when,
+          }),
+          clinicName,
         }),
         (async () => {
           const admins = await findClinicAdmins(this.usersRepository, clinicId);
           await this.notificationsService.notifyStaffMembers(admins, {
-            subject: 'Запись отменена',
-            body: `Отменена запись: ${patientName} к ${doctorName}, ${when} (${service.name}).`,
+            ...appointmentCancelledAdminCopy(locale, {
+              patientName,
+              doctorName,
+              serviceName: service.name,
+              when,
+            }),
+            clinicName,
           });
         })(),
       ]);
@@ -414,6 +450,7 @@ export class AppointmentsService {
   }
 
   private async notifyRescheduled(
+    clinicId: string,
     appointment: AppointmentEntity,
     previousStartsAt: Date,
   ): Promise<void> {
@@ -423,17 +460,30 @@ export class AppointmentsService {
 
     const { patient, doctorProfile, service } = appointment;
     const patientName = `${patient.firstName} ${patient.lastName}`;
-    const previousWhen = this.formatDateTime(previousStartsAt);
-    const nextWhen = this.formatDateTime(appointment.startsAt);
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      clinicId,
+    );
+    const previousWhen = this.formatDateTime(previousStartsAt, locale);
+    const nextWhen = this.formatDateTime(appointment.startsAt, locale);
 
     await Promise.allSettled([
       this.notificationsService.notifyPatient(patient, {
-        subject: 'Время приёма изменено',
-        body: `Время вашего приёма (${service.name}) перенесено: ${previousWhen} → ${nextWhen}.`,
+        ...appointmentRescheduledPatientCopy(locale, {
+          serviceName: service.name,
+          previousWhen,
+          nextWhen,
+        }),
+        clinicName,
       }),
       this.notificationsService.notifyStaffMember(doctorProfile.user, {
-        subject: 'Время приёма изменено',
-        body: `Приём с ${patientName} (${service.name}) перенесён: ${previousWhen} → ${nextWhen}.`,
+        ...appointmentRescheduledDoctorCopy(locale, {
+          patientName,
+          serviceName: service.name,
+          previousWhen,
+          nextWhen,
+        }),
+        clinicName,
       }),
     ]);
   }

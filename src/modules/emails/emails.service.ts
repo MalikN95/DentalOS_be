@@ -4,6 +4,8 @@ import {
   TemplateData,
 } from '../../common/helpers/render-template.helper';
 import { ClinicEntity } from '../../entities/clinic.entity';
+import { PatientMessageChannel } from '../../entities/patient-message.entity';
+import { ChatService } from '../chat/chat.service';
 import { EmailTemplatesService } from '../email-templates/email-templates.service';
 import { MailService } from '../mail/mail.service';
 import { PatientsService } from '../patients/patients.service';
@@ -18,12 +20,14 @@ export class EmailsService {
     private readonly patientsService: PatientsService,
     private readonly emailTemplatesService: EmailTemplatesService,
     private readonly mailService: MailService,
+    private readonly chatService: ChatService,
   ) {}
 
   async sendToPatient(
     clinic: ClinicEntity,
     patientId: string,
     dto: SendPatientEmailDto,
+    sentByUserId: string,
   ): Promise<void> {
     const patient = await this.patientsService.findOne(clinic.id, patientId);
 
@@ -66,13 +70,25 @@ export class EmailsService {
       body = dto.body;
     }
 
+    const renderedSubject = renderTemplate(subject, placeholders);
+    const renderedBody = renderTemplate(body, placeholders);
+
     await this.mailService.sendPatientEmail({
       to: patient.email,
       clinicName: clinic.name,
       clinicPhone: clinic.phone,
       clinicAddress: clinic.address,
-      subject: renderTemplate(subject, placeholders),
-      bodyText: renderTemplate(body, placeholders),
+      subject: renderedSubject,
+      bodyText: renderedBody,
+    });
+
+    await this.chatService.logPatientMessage({
+      clinicId: clinic.id,
+      patientId: patient.id,
+      channel: PatientMessageChannel.EMAIL,
+      subject: renderedSubject,
+      body: renderedBody,
+      sentByUserId,
     });
   }
 }

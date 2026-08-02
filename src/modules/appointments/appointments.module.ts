@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { BranchEntity } from '../../entities/branch.entity';
 import { CabinetEntity } from '../../entities/cabinet.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { DoctorScheduleEntity } from '../../entities/doctor-schedule.entity';
 import { PatientEntity } from '../../entities/patient.entity';
@@ -26,6 +27,7 @@ import { AppointmentsService } from './appointments.service';
       DoctorScheduleEntity,
       ScheduleExceptionEntity,
       UserEntity,
+      ClinicEntity,
     ]),
   ],
   controllers: [AppointmentsController],

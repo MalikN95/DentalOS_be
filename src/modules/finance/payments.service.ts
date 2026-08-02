@@ -5,6 +5,9 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { paymentReceivedCopy } from '../../common/notifications/notification-copy';
+import { resolveClinicNotificationContext } from '../../common/notifications/notification-locale';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import {
   GiftCertificateEntity,
   GiftCertificateStatus,
@@ -30,6 +33,8 @@ export class PaymentsService {
   constructor(
     @InjectRepository(PaymentEntity)
     private readonly paymentsRepository: Repository<PaymentEntity>,
+    @InjectRepository(ClinicEntity)
+    private readonly clinicsRepository: Repository<ClinicEntity>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
@@ -101,12 +106,16 @@ export class PaymentsService {
       },
     );
 
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      clinicId,
+    );
     await this.notificationsService.notifyPatient(patient, {
-      subject: 'Оплата получена',
-      body:
-        invoice.status === InvoiceStatus.PAID
-          ? `Оплата по счёту №${invoice.number} получена в полном объёме. Спасибо!`
-          : `Получена частичная оплата по счёту №${invoice.number}.`,
+      ...paymentReceivedCopy(locale, {
+        invoiceNumber: invoice.number,
+        isFullyPaid: invoice.status === InvoiceStatus.PAID,
+      }),
+      clinicName,
     });
 
     return payment;

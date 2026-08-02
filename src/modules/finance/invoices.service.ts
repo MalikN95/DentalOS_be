@@ -13,7 +13,10 @@ import {
   MoreThanOrEqual,
   Repository,
 } from 'typeorm';
+import { invoiceIssuedCopy } from '../../common/notifications/notification-copy';
+import { resolveClinicNotificationContext } from '../../common/notifications/notification-locale';
 import { AppointmentEntity } from '../../entities/appointment.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DiscountEntity, DiscountType } from '../../entities/discount.entity';
 import { InvoiceItemEntity } from '../../entities/invoice-item.entity';
 import { InvoiceEntity, InvoiceStatus } from '../../entities/invoice.entity';
@@ -49,6 +52,8 @@ export class InvoicesService {
     private readonly invoicesRepository: Repository<InvoiceEntity>,
     @InjectRepository(PaymentEntity)
     private readonly paymentsRepository: Repository<PaymentEntity>,
+    @InjectRepository(ClinicEntity)
+    private readonly clinicsRepository: Repository<ClinicEntity>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
@@ -168,9 +173,16 @@ export class InvoicesService {
       },
     );
 
+    const { locale, clinicName } = await resolveClinicNotificationContext(
+      this.clinicsRepository,
+      clinicId,
+    );
     await this.notificationsService.notifyPatient(patient, {
-      subject: 'Выставлен счёт',
-      body: `Вам выставлен счёт №${invoice.number} на сумму ${invoice.total}.`,
+      ...invoiceIssuedCopy(locale, {
+        invoiceNumber: invoice.number,
+        total: invoice.total,
+      }),
+      clinicName,
     });
 
     return invoice;

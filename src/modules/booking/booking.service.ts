@@ -10,6 +10,12 @@ import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import {
+  bookingConfirmationCopy,
+  newBookingAdminCopy,
+  newBookingDoctorCopy,
+} from '../../common/notifications/notification-copy';
+import { resolveNotificationLocale } from '../../common/notifications/notification-locale';
+import {
   AppointmentEntity,
   AppointmentSource,
 } from '../../entities/appointment.entity';
@@ -426,19 +432,16 @@ export class BookingService {
     branch: BranchEntity,
     patient: PatientEntity,
   ): Promise<void> {
-    const lines = [
-      `${clinic.name}: your appointment is booked.`,
-      `Date: ${dto.date} ${dto.time}`,
-      `Service: ${service.name}`,
-      `Doctor: ${doctorName}`,
-      `Address: ${branch.address}`,
-    ];
-
-    if (service.preparation) {
-      lines.push(`Preparation: ${service.preparation}`);
-    }
-
-    const body = lines.join('\n');
+    const locale = resolveNotificationLocale(clinic.language);
+    const { subject, body } = bookingConfirmationCopy(locale, {
+      clinicName: clinic.name,
+      date: dto.date,
+      time: dto.time,
+      serviceName: service.name,
+      doctorName,
+      address: branch.address,
+      preparation: service.preparation,
+    });
 
     // The confirmation itself is transactional (like a receipt) — always sent
     // regardless of notificationPreferences, same as before. Push is new and
@@ -452,8 +455,9 @@ export class BookingService {
     if (dto.email) {
       await this.notificationsService.send(NotificationChannel.EMAIL, {
         to: dto.email,
-        subject: `Appointment confirmation — ${clinic.name}`,
+        subject,
         body,
+        clinicName: clinic.name,
       });
     }
 
@@ -480,8 +484,13 @@ export class BookingService {
     const { user } = doctor;
     const prefs = user.notificationPreferences;
     const patientName = `${dto.firstName} ${dto.lastName}`;
-    const subject = 'Новая онлайн-запись';
-    const body = `${patientName} записался(-ась) на «${service.name}» ${dto.date} в ${dto.time}.`;
+    const locale = resolveNotificationLocale(clinic.language);
+    const { subject, body } = newBookingDoctorCopy(locale, {
+      patientName,
+      serviceName: service.name,
+      date: dto.date,
+      time: dto.time,
+    });
 
     const sends: Promise<void>[] = [];
 
@@ -491,6 +500,7 @@ export class BookingService {
           to: user.email,
           subject,
           body,
+          clinicName: clinic.name,
         }),
       );
     }
@@ -539,10 +549,18 @@ export class BookingService {
     const admins = await findClinicAdmins(this.usersRepository, clinic.id);
     const patientName = `${dto.firstName} ${dto.lastName}`;
     const doctorName = `${doctor.user.firstName} ${doctor.user.lastName}`;
+    const locale = resolveNotificationLocale(clinic.language);
+    const copy = newBookingAdminCopy(locale, {
+      patientName,
+      doctorName,
+      serviceName: service.name,
+      date: dto.date,
+      time: dto.time,
+    });
 
     await this.notificationsService.notifyStaffMembers(admins, {
-      subject: 'Новая онлайн-запись',
-      body: `${patientName} записался(-ась) к ${doctorName} на «${service.name}» ${dto.date} в ${dto.time}.`,
+      ...copy,
+      clinicName: clinic.name,
     });
   }
 

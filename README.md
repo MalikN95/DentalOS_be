@@ -135,16 +135,26 @@ All routes are protected by default (global guard); public routes are marked wit
 - **SMS / Telegram** — still `LogSender` placeholders (log only), unchanged from before.
 
 **Per-person channel preferences** (this is what the patient/staff card checkboxes write):
-- `PatientEntity.notificationPreferences` (`{ email, whatsapp }`, default both `true`) — gates appointment reminders (`ReminderProcessorService#hasConsent`) and review requests (`ReviewsService#sendReviewRequest`). Patients have no in-app inbox or push (no dashboard login), so only these two channels are offered.
-- `UserEntity.notificationPreferences` (`{ email, whatsapp, push, inApp }`, default all `true`) — gates the one staff-facing event so far: `BookingService#notifyAssignedDoctor`, fired when a patient books online, notifying the assigned doctor on whichever channels they've enabled.
+- `PatientEntity.notificationPreferences` (`{ email, whatsapp, push }`, `push` optional/staff-form-invisible — see below) — gates appointment reminders (`ReminderProcessorService#hasConsent`), review requests, and booking confirmations.
+- `UserEntity.notificationPreferences` (`{ email, whatsapp, push, inApp, reviewAlertMaxRating }`, default all channels `true`, `reviewAlertMaxRating: 3`) — gates every staff-facing event below. `reviewAlertMaxRating` is owner/admin-only: they're alerted about a new review only when its rating is at or below this value (doctors are always notified of reviews about them, unfiltered).
 - `UserEntity.fcmTokens` (`string[]`) — a user's registered web-push device tokens (a browser tab registers one via `POST /notifications/push-subscriptions` after the user grants permission). Multiple tokens per user are normal (several browsers/devices).
+
+**Notification events** (helpers in `src/common/helpers/find-clinic-admins.helper.ts` and `NotificationsService#notifyStaffMember(s)`/`notifyPatient` fan out per-recipient channel prefs automatically):
+- Online booking created → assigned doctor (`BookingService#notifyAssignedDoctor`) + clinic admins (`#notifyClinicAdmins`); the patient gets a transactional SMS/email/push confirmation regardless of preferences (`#sendConfirmation`).
+- Appointment arrived → doctor. Cancelled → patient + doctor + admins. Rescheduled → patient + doctor. (`AppointmentsService#notifyStatusChange`/`#notifyRescheduled`)
+- Invoice issued / payment received → patient. (`InvoicesService#create`, `PaymentsService#create`)
+- New review → doctor (always) + admins (rating-filtered by `reviewAlertMaxRating`). (`ReviewsService#notifyNewReview`)
+- Attempt to delete/deactivate the clinic's last active owner → all admins/owners, and the action is blocked. (`StaffService#assertNotLastOwner`)
+- Appointment reminders (24h/2h before, per `ReminderSettingEntity`) → patient. (`ReminderProcessorService`)
+
+**Message language follows the clinic's own language setting**, not a hardcoded default: `src/common/notifications/notification-copy.ts` holds ru/en/ky copy for every event above (subject + body, matching the frontend's own ru/en/ky dictionaries), and `src/common/notifications/notification-locale.ts#resolveClinicNotificationLocale` looks up `ClinicEntity.language` (falls back to `en`, the column's own default, for an unrecognized value) to pick which one to use — including the `Intl` locale tag (`NOTIFICATION_LOCALE_INTL_TAG`) used to format dates/times in the message body. A clinic changes its language from the Settings page; every notification sent afterward picks it up automatically, no restart needed.
 
 **In-app inbox API** (`notifications.controller.ts`, all under `/api/notifications`, authenticated):
 - `GET /` — paginated list for the current user (`?page&limit&unreadOnly`), includes `unreadCount`.
 - `PATCH /:id/read`, `PATCH /read-all` — mark as read.
 - `POST /push-subscriptions`, `DELETE /push-subscriptions` — register/unregister an FCM device token (body: `{ token }`).
 
-Adding a new notification event elsewhere: inject `NotificationsService`, check the recipient's `notificationPreferences` for the channel(s) you're using (default to `true` if the field is somehow missing, to preserve existing behavior), then `send()`/`sendToMany()`.
+Adding a new notification event elsewhere: inject `NotificationsService` (and, for the recipient's clinic, `Repository<ClinicEntity>` to resolve locale via `resolveClinicNotificationLocale`), write a ru/en/ky copy builder in `notification-copy.ts`, then `notifyStaffMember(s)`/`notifyPatient`/`send()` with its result — those helpers already read the recipient's own `notificationPreferences` per channel.
 
 ## Staff API (`/api/staff`)
 

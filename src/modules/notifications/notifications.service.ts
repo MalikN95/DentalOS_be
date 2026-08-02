@@ -4,7 +4,9 @@ import { Repository } from 'typeorm';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { NotificationEntity } from '../../entities/notification.entity';
 import { PatientEntity } from '../../entities/patient.entity';
+import { PatientMessageChannel } from '../../entities/patient-message.entity';
 import { UserEntity } from '../../entities/user.entity';
+import { ChatService } from '../chat/chat.service';
 import { NotificationListDto } from './dto/notification.dto';
 import {
   NOTIFICATION_SENDERS,
@@ -15,6 +17,8 @@ import {
 export interface NotifyMessage {
   subject?: string;
   body: string;
+  // Shown as the email "From" display name; ignored by every other channel.
+  clinicName?: string;
 }
 
 @Injectable()
@@ -29,6 +33,7 @@ export class NotificationsService {
     private readonly notificationsRepository: Repository<NotificationEntity>,
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
+    private readonly chatService: ChatService,
   ) {
     this.senders = new Map(senders.map((sender) => [sender.channel, sender]));
   }
@@ -120,6 +125,16 @@ export class NotificationsService {
       sends.push(
         this.send(NotificationChannel.EMAIL, { to: patient.email, ...message }),
       );
+      sends.push(
+        this.chatService.logPatientMessage({
+          clinicId: patient.clinicId,
+          patientId: patient.id,
+          channel: PatientMessageChannel.EMAIL,
+          subject: message.subject ?? null,
+          body: message.body,
+          sentByUserId: null,
+        }),
+      );
     }
 
     if (prefs.whatsapp && patient.phone) {
@@ -127,6 +142,15 @@ export class NotificationsService {
         this.send(NotificationChannel.WHATSAPP, {
           to: patient.phone,
           body: message.body,
+        }),
+      );
+      sends.push(
+        this.chatService.logPatientMessage({
+          clinicId: patient.clinicId,
+          patientId: patient.id,
+          channel: PatientMessageChannel.WHATSAPP,
+          body: message.body,
+          sentByUserId: null,
         }),
       );
     }

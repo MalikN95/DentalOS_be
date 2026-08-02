@@ -9,7 +9,10 @@ import { hash as bcryptHash } from 'bcrypt';
 import { Brackets, In, Not, Repository } from 'typeorm';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
+import { lastOwnerAlertCopy } from '../../common/notifications/notification-copy';
+import { resolveClinicNotificationContext } from '../../common/notifications/notification-locale';
 import { BranchEntity } from '../../entities/branch.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { ServiceEntity } from '../../entities/service.entity';
 import { UserEntity } from '../../entities/user.entity';
@@ -38,6 +41,8 @@ export class StaffService {
     private readonly branchesRepository: Repository<BranchEntity>,
     @InjectRepository(ServiceEntity)
     private readonly servicesRepository: Repository<ServiceEntity>,
+    @InjectRepository(ClinicEntity)
+    private readonly clinicsRepository: Repository<ClinicEntity>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -207,7 +212,8 @@ export class StaffService {
     if (losesOwnership) {
       await this.assertNotLastOwner(
         clinicId,
-        `изменить роль или деактивировать владельца ${user.firstName} ${user.lastName}`,
+        'update',
+        `${user.firstName} ${user.lastName}`,
       );
     }
 
@@ -243,7 +249,8 @@ export class StaffService {
     if (user.role === UserRole.OWNER) {
       await this.assertNotLastOwner(
         clinicId,
-        `удалить владельца ${user.firstName} ${user.lastName}`,
+        'remove',
+        `${user.firstName} ${user.lastName}`,
       );
     }
 
@@ -303,7 +310,8 @@ export class StaffService {
   /** Guards the clinic against losing its last active owner. */
   private async assertNotLastOwner(
     clinicId: string,
-    action: string,
+    actionKind: 'update' | 'remove',
+    ownerName: string,
   ): Promise<void> {
     const owners = await this.usersRepository.count({
       where: { clinicId, role: UserRole.OWNER, isActive: true },
@@ -311,9 +319,13 @@ export class StaffService {
 
     if (owners <= 1) {
       const admins = await findClinicAdmins(this.usersRepository, clinicId);
+      const { locale, clinicName } = await resolveClinicNotificationContext(
+        this.clinicsRepository,
+        clinicId,
+      );
       await this.notificationsService.notifyStaffMembers(admins, {
-        subject: 'Попытка удалить последнего владельца',
-        body: `Кто-то попытался ${action} — клиника осталась бы без активного владельца. Действие заблокировано.`,
+        ...lastOwnerAlertCopy(locale, { actionKind, ownerName }),
+        clinicName,
       });
 
       throw new BadRequestException(
