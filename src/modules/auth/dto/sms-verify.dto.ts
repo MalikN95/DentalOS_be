@@ -6,7 +6,7 @@ export class SmsVerifyDto {
   @Matches(/^\+?\d{10,15}$/u, { message: 'phone must be a valid number' })
   phone: string;
 
-  @ApiProperty({ example: '123456', description: '6-digit SMS code' })
-  @Matches(/^\d{6}$/u, { message: 'code must be a 6-digit number' })
+  @ApiProperty({ example: '1234', description: '4-digit SMS code' })
+  @Matches(/^\d{4}$/u, { message: 'code must be a 4-digit number' })
   code: string;
 }

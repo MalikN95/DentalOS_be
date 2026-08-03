@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
 import { MedicalRecordEntity } from '../../entities/medical-record.entity';
+import { OtpCodeEntity } from '../../entities/otp-code.entity';
 import { PatientFileEntity } from '../../entities/patient-file.entity';
 import { PatientNoteEntity } from '../../entities/patient-note.entity';
 import { PatientTagEntity } from '../../entities/patient-tag.entity';
@@ -22,6 +23,7 @@ import { PatientsService } from './patients.service';
       AppointmentEntity,
       MedicalRecordEntity,
       DoctorProfileEntity,
+      OtpCodeEntity,
     ]),
   ],
   controllers: [PatientsController],

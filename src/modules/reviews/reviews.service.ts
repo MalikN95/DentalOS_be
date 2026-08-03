@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -131,6 +132,81 @@ export class ReviewsService {
     await this.notifyNewReview(review);
 
     return { success: true };
+  }
+
+  // Patient-portal counterpart to submit() — the patient is already
+  // authenticated (JWT), so there's no one-time token: ownership is checked
+  // directly against the appointment instead. Unlike submit(), calling this
+  // again on an already-reviewed appointment EDITS it rather than rejecting.
+  async submitOwnReview(
+    clinicId: string,
+    patientId: string,
+    appointmentId: string,
+    rating: number,
+    comment: string | undefined,
+  ): Promise<ReviewEntity> {
+    const appointment = await this.appointmentsRepository.findOne({
+      where: { id: appointmentId, clinicId },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.patientId !== patientId) {
+      throw new ForbiddenException('This appointment does not belong to you');
+    }
+
+    if (appointment.status !== AppointmentStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Only completed appointments can be reviewed',
+      );
+    }
+
+    const existing = await this.reviewsRepository.findOne({
+      where: { appointmentId },
+    });
+
+    const review =
+      existing ??
+      this.reviewsRepository.create({
+        clinicId,
+        appointmentId,
+        patientId: appointment.patientId,
+        doctorProfileId: appointment.doctorProfileId,
+      });
+
+    const isNew = !existing;
+    review.rating = rating;
+    review.comment = comment ?? null;
+    review.status = ReviewStatus.PUBLISHED;
+    review.requestToken = null;
+
+    const saved = await this.reviewsRepository.save(review);
+
+    // Only alert staff the first time — an edit isn't a new event worth paging anyone about.
+    if (isNew) {
+      const withPatient = await this.reviewsRepository.findOne({
+        where: { id: saved.id },
+        relations: { patient: true },
+      });
+      if (withPatient) {
+        await this.notifyNewReview(withPatient);
+      }
+    }
+
+    return saved;
+  }
+
+  // Only ever the patient's own rated reviews (rating 0 = a pending staff-
+  // requested token the patient hasn't rated yet — not theirs to see as "their review").
+  async findMyReviews(
+    clinicId: string,
+    patientId: string,
+  ): Promise<ReviewEntity[]> {
+    return this.reviewsRepository.find({
+      where: { clinicId, patientId, rating: MoreThan(NOT_RATED) },
+    });
   }
 
   private async notifyNewReview(review: ReviewEntity): Promise<void> {

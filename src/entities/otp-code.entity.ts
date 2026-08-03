@@ -32,4 +32,11 @@ export class OtpCodeEntity extends BaseEntity {
 
   @Column({ default: false })
   isUsed: boolean;
+
+  // Dev/QA convenience only: the plaintext code, populated by SmsAuthService
+  // ONLY when WhatsApp isn't actually configured and NODE_ENV isn't
+  // 'production' (see SmsAuthService#shouldExposeDevPlainCode). Null in any
+  // real deployment — staff can never read a patient's real login code.
+  @Column({ type: 'varchar', nullable: true })
+  devPlainCode: string | null;
 }

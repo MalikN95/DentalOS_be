@@ -5,6 +5,7 @@ import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-
 import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
+import { OtpCodeEntity, OtpPurpose } from '../../entities/otp-code.entity';
 import { PatientTagEntity } from '../../entities/patient-tag.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { CreatePatientDto } from './dto/create-patient.dto';
@@ -31,7 +32,35 @@ export class PatientsService {
     private readonly tagsRepository: Repository<PatientTagEntity>,
     @InjectRepository(DoctorProfileEntity)
     private readonly doctorProfilesRepository: Repository<DoctorProfileEntity>,
+    @InjectRepository(OtpCodeEntity)
+    private readonly otpCodesRepository: Repository<OtpCodeEntity>,
   ) {}
+
+  // Dev/QA convenience only — see OtpCodeEntity#devPlainCode. Returns null in
+  // any real deployment (the column is only ever populated there), and null
+  // once the patient's current code has been used or has expired.
+  async getDevLoginCode(
+    clinicId: string,
+    patientId: string,
+  ): Promise<{ code: string | null }> {
+    const patient = await this.findOne(clinicId, patientId);
+
+    const otp = await this.otpCodesRepository.findOne({
+      where: {
+        clinicId,
+        destination: patient.phone,
+        purpose: OtpPurpose.SMS_LOGIN,
+        isUsed: false,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!otp || otp.expiresAt.getTime() <= Date.now()) {
+      return { code: null };
+    }
+
+    return { code: otp.devPlainCode };
+  }
 
   async findAll(
     clinicId: string,

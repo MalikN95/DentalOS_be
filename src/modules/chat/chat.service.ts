@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ChatMessageEntity } from '../../entities/chat-message.entity';
 import {
   PatientMessageChannel,
+  PatientMessageDirection,
   PatientMessageEntity,
 } from '../../entities/patient-message.entity';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
@@ -24,6 +25,12 @@ export interface LogPatientMessageInput {
   subject?: string | null;
   body: string;
   sentByUserId?: string | null;
+}
+
+export interface ReceivePatientMessageInput {
+  clinicId: string;
+  patientId: string;
+  body: string;
 }
 
 @Injectable()
@@ -100,6 +107,7 @@ export class ChatService {
         patientName: `${message.patient.firstName} ${message.patient.lastName}`,
         lastMessageAt: message.createdAt,
         lastMessageChannel: message.channel,
+        lastMessageDirection: message.direction,
         lastMessagePreview: this.buildPreview(message.body),
       }))
       .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
@@ -156,6 +164,27 @@ export class ChatService {
     }
   }
 
+  // Patient-authored reply from the portal. Unlike logPatientMessage this
+  // never swallows errors — it's the write the patient is waiting on, not a
+  // best-effort log of a send that already succeeded elsewhere.
+  async receivePatientMessage(
+    input: ReceivePatientMessageInput,
+  ): Promise<PatientMessageSummary> {
+    const saved = await this.patientMessagesRepository.save(
+      this.patientMessagesRepository.create({
+        clinicId: input.clinicId,
+        patientId: input.patientId,
+        channel: PatientMessageChannel.PORTAL,
+        direction: PatientMessageDirection.INBOUND,
+        subject: null,
+        body: input.body,
+        sentByUserId: null,
+      }),
+    );
+
+    return this.toPatientMessageSummary(saved);
+  }
+
   private buildPreview(body: string): string {
     return body.length > PREVIEW_LENGTH
       ? `${body.slice(0, PREVIEW_LENGTH)}…`
@@ -187,6 +216,7 @@ export class ChatService {
     return {
       id: entity.id,
       channel: entity.channel,
+      direction: entity.direction,
       subject: entity.subject,
       body: entity.body,
       createdAt: entity.createdAt,

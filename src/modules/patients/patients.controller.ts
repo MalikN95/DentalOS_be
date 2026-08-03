@@ -97,6 +97,18 @@ export class PatientsController {
     return this.patientsService.listChronicDiseasesCatalog(clinic.id);
   }
 
+  @Get(':id/dev-login-code')
+  @Roles(...STAFF_ROLES)
+  @ApiOkResponse({
+    description: 'Dev/QA only — code is null in any real deployment',
+  })
+  getDevLoginCode(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ code: string | null }> {
+    return this.patientsService.getDevLoginCode(clinic.id, id);
+  }
+
   @Get(':id/history')
   @ApiOkResponse({ description: 'Paginated visit history (appointments)' })
   getHistory(

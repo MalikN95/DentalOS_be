@@ -7,11 +7,19 @@ import { UserEntity } from './user.entity';
 export enum PatientMessageChannel {
   EMAIL = 'email',
   WHATSAPP = 'whatsapp',
+  // Patient-authored reply typed directly into the patient portal (no email/WhatsApp send involved).
+  PORTAL = 'portal',
 }
 
-// Read-only log of messages actually sent to a patient over email/WhatsApp —
-// written by EmailsService/NotificationsService right after a send succeeds,
-// never written to directly by staff (the Chats page only reads this table).
+export enum PatientMessageDirection {
+  // Clinic -> patient (email/WhatsApp send), written by EmailsService/NotificationsService.
+  OUTBOUND = 'outbound',
+  // Patient -> clinic, written by ChatService.receivePatientMessage from the patient portal.
+  INBOUND = 'inbound',
+}
+
+// Log of every message exchanged with a patient — outbound sends (email/WhatsApp)
+// and inbound patient-portal replies share this one timeline (see `direction`).
 @Entity('patient_messages')
 @Index(['clinicId', 'patientId', 'createdAt'])
 export class PatientMessageEntity extends BaseEntity {
@@ -31,6 +39,13 @@ export class PatientMessageEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: PatientMessageChannel })
   channel: PatientMessageChannel;
+
+  @Column({
+    type: 'enum',
+    enum: PatientMessageDirection,
+    default: PatientMessageDirection.OUTBOUND,
+  })
+  direction: PatientMessageDirection;
 
   // Email only — WhatsApp messages have no subject line.
   @Column({ type: 'varchar', nullable: true })

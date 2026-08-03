@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare as bcryptCompare, hash as bcryptHash } from 'bcrypt';
 import { MoreThan, Repository } from 'typeorm';
@@ -32,7 +33,23 @@ export class SmsAuthService {
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
     private readonly notificationsService: NotificationsService,
+    private readonly configService: ConfigService,
   ) {}
+
+  // Dev/QA convenience only: never true once WhatsApp is actually configured,
+  // and never true in production regardless — see OtpCodeEntity#devPlainCode.
+  private shouldExposeDevPlainCode(): boolean {
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      return false;
+    }
+
+    const hasWhatsAppCredentials = Boolean(
+      this.configService.get<string>('WHATSAPP_ACCESS_TOKEN') &&
+      this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID'),
+    );
+
+    return !hasWhatsAppCredentials;
+  }
 
   async requestCode(clinicId: string, phone: string): Promise<void> {
     const recentCode = await this.otpRepository.findOne({
@@ -59,7 +76,7 @@ export class SmsAuthService {
       { isUsed: true },
     );
 
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const code = randomInt(0, 10_000).toString().padStart(4, '0');
     const codeHash = await bcryptHash(code, BCRYPT_ROUNDS);
 
     await this.otpRepository.save(
@@ -69,10 +86,11 @@ export class SmsAuthService {
         purpose: OtpPurpose.SMS_LOGIN,
         codeHash,
         expiresAt: new Date(Date.now() + CODE_TTL_MS),
+        devPlainCode: this.shouldExposeDevPlainCode() ? code : null,
       }),
     );
 
-    await this.notificationsService.send(NotificationChannel.SMS, {
+    await this.notificationsService.send(NotificationChannel.WHATSAPP, {
       to: phone,
       body: `Код входа: ${code}`,
     });

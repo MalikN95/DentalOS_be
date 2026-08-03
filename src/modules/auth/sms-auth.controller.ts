@@ -9,7 +9,7 @@ import { TokensDto } from './dto/tokens.dto';
 import { SmsAuthService } from './sms-auth.service';
 
 @ApiTags('auth')
-@Controller('auth/sms')
+@Controller('auth/:clinicSlug/sms')
 export class SmsAuthController {
   constructor(private readonly smsAuthService: SmsAuthService) {}
 

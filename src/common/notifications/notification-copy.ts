@@ -446,3 +446,25 @@ export const appointmentReminderCopy = (
     body: `Напоминание о приёме ${p.when}, услуга ${p.serviceName}, врач ${p.doctorName}`,
   };
 };
+
+export const newPatientPortalMessageCopy = (
+  locale: NotificationLocale,
+  p: { patientName: string; preview: string },
+): NotificationCopy => {
+  if (locale === 'en') {
+    return {
+      subject: 'New patient message',
+      body: `${p.patientName} sent a message via the patient portal: "${p.preview}"`,
+    };
+  }
+  if (locale === 'ky') {
+    return {
+      subject: 'Жаңы билдирүү',
+      body: `${p.patientName} бейтап кабинети аркылуу билдирүү жөнөттү: «${p.preview}»`,
+    };
+  }
+  return {
+    subject: 'Новое сообщение от пациента',
+    body: `${p.patientName} написал(-а) через личный кабинет: «${p.preview}»`,
+  };
+};
