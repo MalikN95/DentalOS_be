@@ -176,6 +176,15 @@ Behaviour worth knowing:
 - Guards: you cannot delete your own account, and the clinic always keeps at least one active owner (blocks deleting, deactivating or demoting the last one).
 - `passwordHash`, `mfaSecret` and `refreshJti` are `select: false` and never leave the API; updates use an explicit column patch so they are not clobbered.
 
+## Doctor scheduling (`/api/schedules`, `/api/booking`)
+
+`DoctorScheduleEntity` (`doctor_schedules`, one row per doctor/branch/weekday with `startTime`/`endTime`) is the recurring weekly template; `ScheduleExceptionEntity` (`schedule_exceptions`) blocks booking over an inclusive date range with a `type` of `vacation | sick_leave | holiday | day_off`. Both tables previously only existed via `DB_SYNC` in dev — never migrated — until `1786500000000-DoctorSchedules.ts` gave them their first real migration (same gap `PatientTags`/`Chat` had before).
+
+- `GET/PUT /api/schedules/doctor/:doctorProfileId` — the weekly template (owner/admin write; a `DOCTOR` caller can only read their own, enforced by `SchedulesService#getOwnedProfile` comparing `profile.userId` to the JWT `sub`).
+- `GET/POST /api/schedules/doctor/:doctorProfileId/exceptions`, `DELETE /api/schedules/exceptions/:id` — vacation/sick-leave/holiday/day-off entries. `DOCTOR` can create/delete **their own** (added alongside the frontend's self-service UI on `/my-schedule`); the ownership check on delete now does an `innerJoinAndSelect` on `doctorProfile` so it can compare `userId` without an extra query.
+- `AppointmentsService#assertWithinWorkingHours` rejects a booking outside the weekly template or inside an exception's date range (`400`, `code: 'DOCTOR_DAY_OFF'`) — the error payload now also carries `exceptionType` (which of the four it hit) so the frontend can show "on vacation" vs. "sick leave" vs. a plain day off instead of one generic message.
+- `DoctorProfileEntity.maxAdvanceBookingDays` (nullable int, `null` = no limit) caps how far ahead a patient can self-book that doctor through the **public** booking widget only — `AvailabilityService#collectDaySlots` returns no slots for any date beyond `today + maxAdvanceBookingDays`. Staff creating appointments internally via `POST /api/appointments` are never subject to this. Editable via `StaffDoctorDto#maxAdvanceBookingDays` (0–365) on the same `PATCH /api/staff/:id` used for `acceptsOnlineBooking`.
+
 ## Linting
 
 ESLint 9 (flat config) with Airbnb style guide via `eslint-config-airbnb-extended` (base + node + typescript) plus `typescript-eslint` type-checked rules, Prettier applied last. NestJS/TypeORM-specific overrides: entity import cycles allowed, `prefer-default-export` off, `void promise` statements allowed.

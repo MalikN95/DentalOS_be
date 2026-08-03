@@ -64,6 +64,7 @@ interface AvailabilityRepositories {
 
 interface AvailabilityContext {
   params: AvailabilityParams;
+  doctor: DoctorProfileEntity;
   service: ServiceEntity;
   schedulesByWeekday: Map<number, DoctorScheduleEntity>;
   exceptions: ScheduleExceptionEntity[];
@@ -307,6 +308,7 @@ export class AvailabilityService {
 
     return {
       params,
+      doctor,
       service,
       schedulesByWeekday: new Map(
         schedules.map((schedule) => [schedule.weekday, schedule]),
@@ -358,6 +360,17 @@ export class AvailabilityService {
     date: string,
     now: Date,
   ): DaySlot[] {
+    const { maxAdvanceBookingDays } = context.doctor;
+
+    if (maxAdvanceBookingDays !== null) {
+      const maxDate = new Date(now);
+      maxDate.setDate(maxDate.getDate() + maxAdvanceBookingDays);
+
+      if (date > formatLocalDate(maxDate)) {
+        return [];
+      }
+    }
+
     const schedule = context.schedulesByWeekday.get(weekdayOf(date));
 
     if (!schedule) {

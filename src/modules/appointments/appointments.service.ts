@@ -670,7 +670,7 @@ export class AppointmentsService {
     }
 
     const date = formatLocalDate(startsAt);
-    const isDayOff = await this.scheduleExceptionsRepository.exists({
+    const exception = await this.scheduleExceptionsRepository.findOne({
       where: {
         doctorProfileId,
         dateFrom: LessThanOrEqual(date),
@@ -678,10 +678,11 @@ export class AppointmentsService {
       },
     });
 
-    if (isDayOff) {
+    if (exception) {
       throw new BadRequestException({
         message: 'Doctor is not working on this date',
         code: 'DOCTOR_DAY_OFF',
+        exceptionType: exception.type,
       });
     }
   }

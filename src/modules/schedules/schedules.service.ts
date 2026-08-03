@@ -141,8 +141,9 @@ export class SchedulesService {
     clinicId: string,
     doctorProfileId: string,
     dto: CreateScheduleExceptionDto,
+    user: JwtPayload,
   ): Promise<ScheduleExceptionEntity> {
-    await this.getOwnedProfile(clinicId, doctorProfileId);
+    await this.getOwnedProfile(clinicId, doctorProfileId, user);
 
     if (dto.dateFrom > dto.dateTo) {
       throw new BadRequestException('dateFrom must not be after dateTo');
@@ -159,16 +160,29 @@ export class SchedulesService {
     return this.exceptionsRepository.save(exception);
   }
 
-  async removeException(clinicId: string, id: string): Promise<void> {
+  async removeException(
+    clinicId: string,
+    id: string,
+    user: JwtPayload,
+  ): Promise<void> {
     const exception = await this.exceptionsRepository
       .createQueryBuilder('exception')
-      .innerJoin('exception.doctorProfile', 'doctorProfile')
+      .innerJoinAndSelect('exception.doctorProfile', 'doctorProfile')
       .where('exception.id = :id', { id })
       .andWhere('doctorProfile.clinicId = :clinicId', { clinicId })
       .getOne();
 
     if (!exception) {
       throw new NotFoundException('Schedule exception not found');
+    }
+
+    if (
+      user.role === UserRole.DOCTOR &&
+      exception.doctorProfile.userId !== user.sub
+    ) {
+      throw new ForbiddenException(
+        'Doctors may only manage their own schedule',
+      );
     }
 
     await this.exceptionsRepository.softRemove(exception);

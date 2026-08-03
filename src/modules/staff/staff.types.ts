@@ -33,6 +33,7 @@ export interface StaffDoctorProfile {
   description: string | null;
   isActive: boolean;
   acceptsOnlineBooking: boolean;
+  maxAdvanceBookingDays: number | null;
   services: StaffDoctorServiceOption[];
 }
 

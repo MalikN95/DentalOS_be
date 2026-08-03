@@ -83,9 +83,10 @@ export class SchedulesController {
   }
 
   @Post('doctor/:doctorProfileId/exceptions')
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   createException(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser() user: JwtPayload,
     @Param('doctorProfileId', ParseUUIDPipe) doctorProfileId: string,
     @Body() dto: CreateScheduleExceptionDto,
   ): Promise<ScheduleExceptionEntity> {
@@ -93,16 +94,18 @@ export class SchedulesController {
       clinic.id,
       doctorProfileId,
       dto,
+      user,
     );
   }
 
   @Delete('exceptions/:id')
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   @HttpCode(HttpStatus.NO_CONTENT)
   removeException(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.schedulesService.removeException(clinic.id, id);
+    return this.schedulesService.removeException(clinic.id, id, user);
   }
 }

@@ -69,4 +69,9 @@ export class DoctorProfileEntity extends BaseEntity {
   // Only doctors with this on are offered through the public online-booking widget.
   @Column({ default: false })
   acceptsOnlineBooking: boolean;
+
+  // Caps how far ahead a patient can self-book this doctor through the public
+  // widget; null = no limit. Doesn't affect staff creating appointments internally.
+  @Column({ type: 'int', nullable: true })
+  maxAdvanceBookingDays: number | null;
 }

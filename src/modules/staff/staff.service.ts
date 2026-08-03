@@ -381,6 +381,7 @@ export class StaffService {
           education: dto.education ?? [],
           specializations: dto.specializations ?? [],
           acceptsOnlineBooking: dto.acceptsOnlineBooking ?? false,
+          maxAdvanceBookingDays: dto.maxAdvanceBookingDays ?? null,
           services: dto.serviceIds
             ? await this.getOwnedServices(clinicId, dto.serviceIds)
             : [],
@@ -416,6 +417,10 @@ export class StaffService {
 
     if (dto.acceptsOnlineBooking !== undefined) {
       existing.acceptsOnlineBooking = dto.acceptsOnlineBooking;
+    }
+
+    if (dto.maxAdvanceBookingDays !== undefined) {
+      existing.maxAdvanceBookingDays = dto.maxAdvanceBookingDays;
     }
 
     if (dto.serviceIds !== undefined) {
@@ -508,6 +513,7 @@ export class StaffService {
       description: profile.description,
       isActive: profile.isActive,
       acceptsOnlineBooking: profile.acceptsOnlineBooking,
+      maxAdvanceBookingDays: profile.maxAdvanceBookingDays,
       services: (profile.services ?? []).map((service) => ({
         id: service.id,
         name: service.name,

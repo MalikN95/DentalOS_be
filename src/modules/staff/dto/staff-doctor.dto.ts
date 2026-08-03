@@ -57,6 +57,20 @@ export class StaffDoctorDto {
   acceptsOnlineBooking?: boolean;
 
   @ApiPropertyOptional({
+    nullable: true,
+    minimum: 0,
+    maximum: 365,
+    description:
+      'How many days ahead a patient can self-book this doctor through the public widget; null/omitted = no limit. Only affects the public widget, not staff-created appointments.',
+  })
+  @IsOptional()
+  @ValidateIf((dto: StaffDoctorDto) => dto.maxAdvanceBookingDays !== null)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  maxAdvanceBookingDays?: number | null;
+
+  @ApiPropertyOptional({
     type: [String],
     format: 'uuid',
     description:
