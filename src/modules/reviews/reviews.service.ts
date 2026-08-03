@@ -10,12 +10,14 @@ import { FindOptionsWhere, MoreThan, Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
+import { resolveOwnDoctorProfileIdIfDoctor } from '../../common/helpers/resolve-own-doctor-profile-id.helper';
 import {
   newReviewAdminCopy,
   newReviewDoctorCopy,
   reviewRequestCopy,
 } from '../../common/notifications/notification-copy';
 import { resolveClinicNotificationContext } from '../../common/notifications/notification-locale';
+import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { DoctorProfileEntity } from '../../entities/doctor-profile.entity';
@@ -190,6 +192,7 @@ export class ReviewsService {
   async findAll(
     clinicId: string,
     query: ListReviewsQueryDto,
+    user: JwtPayload,
   ): Promise<PaginatedResult<ReviewEntity>> {
     const {
       page,
@@ -207,7 +210,17 @@ export class ReviewsService {
       where.status = status;
     }
 
-    if (doctorProfileId !== undefined) {
+    // A doctor only ever sees their own reviews — any doctorProfileId passed
+    // in the query is ignored rather than trusted.
+    const ownDoctorProfileId = await resolveOwnDoctorProfileIdIfDoctor(
+      this.doctorProfilesRepository,
+      clinicId,
+      user,
+    );
+
+    if (ownDoctorProfileId) {
+      where.doctorProfileId = ownDoctorProfileId;
+    } else if (doctorProfileId !== undefined) {
       where.doctorProfileId = doctorProfileId;
     }
 

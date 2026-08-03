@@ -12,9 +12,11 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentClinic } from '../../common/decorators/current-clinic.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import type { JwtPayload } from '../../common/types/jwt-payload.type';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { ReviewEntity } from '../../entities/review.entity';
 import { ListReviewsQueryDto } from './dto/list-reviews-query.dto';
@@ -58,8 +60,9 @@ export class ReviewsController {
   findAll(
     @CurrentClinic() clinic: ClinicEntity,
     @Query() query: ListReviewsQueryDto,
+    @CurrentUser() user: JwtPayload,
   ): Promise<PaginatedResult<ReviewEntity>> {
-    return this.reviewsService.findAll(clinic.id, query);
+    return this.reviewsService.findAll(clinic.id, query, user);
   }
 
   @Patch(':id/status')
