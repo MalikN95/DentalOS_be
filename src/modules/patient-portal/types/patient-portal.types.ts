@@ -19,6 +19,7 @@ export interface PatientPortalAppointmentSummary {
   price: string;
   comment: string | null;
   cancellationReason: string | null;
+  cancelledBy: 'patient' | 'staff' | null;
   isCancellable: boolean;
 }
 

@@ -3,9 +3,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // Tracks who actually cancelled an appointment (patient via the portal, or a
 // staff member via the dashboard) — both are UserEntity rows, distinguished
 // by `cancelledBy.role`.
-export class AppointmentCancelledBy1786900000000
-  implements MigrationInterface
-{
+export class AppointmentCancelledBy1786900000000 implements MigrationInterface {
   name = 'AppointmentCancelledBy1786900000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

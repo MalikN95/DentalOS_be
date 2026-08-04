@@ -16,6 +16,14 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { ReviewEntity } from '../../entities/review.entity';
+import { BookForPatientDto } from '../booking/dto/book-for-patient.dto';
+import { BookingBranchDto } from '../booking/dto/booking-branch.dto';
+import { BookingConfirmationDto } from '../booking/dto/booking-confirmation.dto';
+import { BookingDaysQueryDto } from '../booking/dto/booking-days-query.dto';
+import { BookingDoctorDto } from '../booking/dto/booking-doctor.dto';
+import { BookingDoctorsQueryDto } from '../booking/dto/booking-doctors-query.dto';
+import { BookingServiceCategoryDto } from '../booking/dto/booking-service-category.dto';
+import { BookingSlotsQueryDto } from '../booking/dto/booking-slots-query.dto';
 import { PaginationQueryDto } from '../chat/dto/pagination-query.dto';
 import { PatientMessageSummary } from '../chat/types/chat.types';
 import { PaginatedResult } from '../chat/types/paginated-result.type';
@@ -114,5 +122,64 @@ export class PatientPortalController {
       dto.rating,
       dto.comment,
     );
+  }
+
+  @Get('booking/branches')
+  getBookingBranches(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<BookingBranchDto[]> {
+    return this.patientPortalService.getBookingBranches(clinic.id);
+  }
+
+  @Get('booking/services')
+  getBookingServices(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<BookingServiceCategoryDto[]> {
+    return this.patientPortalService.getBookingServices(clinic.id);
+  }
+
+  @Get('booking/doctors')
+  getBookingDoctors(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Query() query: BookingDoctorsQueryDto,
+  ): Promise<BookingDoctorDto[]> {
+    return this.patientPortalService.getBookingDoctors(clinic.id, query);
+  }
+
+  @Get('booking/days')
+  getBookingDays(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Query() query: BookingDaysQueryDto,
+  ): Promise<string[]> {
+    return this.patientPortalService.getBookingDays(
+      clinic.id,
+      query.doctorProfileId,
+      query.serviceId,
+      query.branchId,
+      query.month,
+    );
+  }
+
+  @Get('booking/slots')
+  getBookingSlots(
+    @CurrentClinic() clinic: ClinicEntity,
+    @Query() query: BookingSlotsQueryDto,
+  ): Promise<string[]> {
+    return this.patientPortalService.getBookingSlots(
+      clinic.id,
+      query.doctorProfileId,
+      query.serviceId,
+      query.branchId,
+      query.date,
+    );
+  }
+
+  @Post('booking')
+  bookAppointment(
+    @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: BookForPatientDto,
+  ): Promise<BookingConfirmationDto> {
+    return this.patientPortalService.bookAppointment(clinic, userId, dto);
   }
 }

@@ -16,6 +16,14 @@ import { PatientEntity } from '../../entities/patient.entity';
 import { ReviewEntity } from '../../entities/review.entity';
 import { UserEntity } from '../../entities/user.entity';
 import { AppointmentsService } from '../appointments/appointments.service';
+import { AvailabilityService } from '../booking/availability.service';
+import { BookingService } from '../booking/booking.service';
+import { BookForPatientDto } from '../booking/dto/book-for-patient.dto';
+import { BookingBranchDto } from '../booking/dto/booking-branch.dto';
+import { BookingConfirmationDto } from '../booking/dto/booking-confirmation.dto';
+import { BookingDoctorDto } from '../booking/dto/booking-doctor.dto';
+import { BookingDoctorsQueryDto } from '../booking/dto/booking-doctors-query.dto';
+import { BookingServiceCategoryDto } from '../booking/dto/booking-service-category.dto';
 import { ChatService } from '../chat/chat.service';
 import { PaginationQueryDto } from '../chat/dto/pagination-query.dto';
 import { PatientMessageSummary } from '../chat/types/chat.types';
@@ -60,6 +68,8 @@ export class PatientPortalService {
     private readonly chatService: ChatService,
     private readonly reviewsService: ReviewsService,
     private readonly notificationsService: NotificationsService,
+    private readonly bookingService: BookingService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   async resolveOwnPatient(
@@ -180,7 +190,7 @@ export class PatientPortalService {
     appointment.cancellationReason = cancellationReason;
     appointment.cancelledByUserId = userId;
 
-    return this.toAppointmentSummary(appointment, new Date());
+    return this.toAppointmentSummary(appointment, new Date(), userId);
   }
 
   async listMessages(
@@ -240,6 +250,60 @@ export class PatientPortalService {
     );
   }
 
+  // Booking, read side — thin pass-throughs to the same BookingService/
+  // AvailabilityService the public /book/:clinicSlug widget uses, just
+  // resolved from the JWT's clinicId instead of a slug lookup.
+  getBookingBranches(clinicId: string): Promise<BookingBranchDto[]> {
+    return this.bookingService.getBranches(clinicId);
+  }
+
+  getBookingServices(clinicId: string): Promise<BookingServiceCategoryDto[]> {
+    return this.bookingService.getServices(clinicId);
+  }
+
+  getBookingDoctors(
+    clinicId: string,
+    query: BookingDoctorsQueryDto,
+  ): Promise<BookingDoctorDto[]> {
+    return this.bookingService.getDoctors(clinicId, query);
+  }
+
+  getBookingDays(
+    clinicId: string,
+    doctorProfileId: string,
+    serviceId: string,
+    branchId: string,
+    month: string,
+  ): Promise<string[]> {
+    return this.availabilityService.getAvailableDays(
+      { clinicId, doctorProfileId, serviceId, branchId },
+      month,
+    );
+  }
+
+  getBookingSlots(
+    clinicId: string,
+    doctorProfileId: string,
+    serviceId: string,
+    branchId: string,
+    date: string,
+  ): Promise<string[]> {
+    return this.availabilityService.getAvailableSlots(
+      { clinicId, doctorProfileId, serviceId, branchId },
+      date,
+    );
+  }
+
+  async bookAppointment(
+    clinic: ClinicEntity,
+    userId: string,
+    dto: BookForPatientDto,
+  ): Promise<BookingConfirmationDto> {
+    const patient = await this.resolveOwnPatient(clinic.id, userId);
+
+    return this.bookingService.bookForPatient(clinic, patient.id, dto);
+  }
+
   private async notifyStaffOfMessage(
     clinicId: string,
     patient: PatientEntity,
@@ -277,6 +341,7 @@ export class PatientPortalService {
   private toAppointmentSummary(
     appointment: AppointmentEntity,
     now: Date,
+    ownUserId?: string,
   ): PatientPortalAppointmentSummary {
     return {
       id: appointment.id,
@@ -291,9 +356,24 @@ export class PatientPortalService {
       price: appointment.price,
       comment: appointment.comment,
       cancellationReason: appointment.cancellationReason,
+      cancelledBy: this.resolveCancelledBy(
+        appointment.cancelledByUserId,
+        ownUserId,
+      ),
       isCancellable:
         PATIENT_CANCELLABLE_STATUSES.includes(appointment.status) &&
         appointment.startsAt.getTime() > now.getTime(),
     };
+  }
+
+  private resolveCancelledBy(
+    cancelledByUserId: string | null,
+    ownUserId: string | undefined,
+  ): 'patient' | 'staff' | null {
+    if (!cancelledByUserId) {
+      return null;
+    }
+
+    return cancelledByUserId === ownUserId ? 'patient' : 'staff';
   }
 }

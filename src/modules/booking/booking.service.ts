@@ -36,6 +36,7 @@ import {
   AvailabilityParams,
   AvailabilityService,
 } from './availability.service';
+import { BookForPatientDto } from './dto/book-for-patient.dto';
 import { BookingBranchDto } from './dto/booking-branch.dto';
 import { BookingClinicDto } from './dto/booking-clinic.dto';
 import { BookingConfirmationDto } from './dto/booking-confirmation.dto';
@@ -379,6 +380,139 @@ export class BookingService {
     );
     await this.notifyAssignedDoctor(clinic, doctor, dto, service);
     await this.notifyClinicAdmins(clinic, doctor, dto, service);
+
+    return {
+      appointmentId: appointment.id,
+      patientId: patient.id,
+      status: appointment.status,
+      startsAt: appointment.startsAt,
+      doctorName,
+      serviceName: service.name,
+      branchAddress: branch.address,
+    };
+  }
+
+  // Patient-portal counterpart to createBooking() — the patient is already
+  // known (resolved from the JWT, not collected from a contact-info form),
+  // so this skips the phone-based patient upsert and the CRM lead row, but
+  // otherwise shares the same slot-safety, reminder and notification logic.
+  async bookForPatient(
+    clinic: ClinicEntity,
+    patientId: string,
+    dto: BookForPatientDto,
+  ): Promise<BookingConfirmationDto> {
+    const patient = await this.patientsRepository.findOne({
+      where: { id: patientId, clinicId: clinic.id },
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+
+    const doctor = await this.doctorRepository.findOne({
+      where: {
+        id: dto.doctorProfileId,
+        clinicId: clinic.id,
+        isActive: true,
+        acceptsOnlineBooking: true,
+      },
+      relations: { user: true },
+    });
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    const providesService = await this.doctorRepository
+      .createQueryBuilder('doctor')
+      .innerJoin('doctor.services', 'service', 'service.id = :serviceId', {
+        serviceId: dto.serviceId,
+      })
+      .where('doctor.id = :doctorProfileId', {
+        doctorProfileId: dto.doctorProfileId,
+      })
+      .getExists();
+
+    if (!providesService) {
+      throw new BadRequestException('Doctor does not provide this service');
+    }
+
+    const branch = await this.branchRepository.findOne({
+      where: { id: dto.branchId, clinicId: clinic.id, isActive: true },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    const params: AvailabilityParams = {
+      clinicId: clinic.id,
+      doctorProfileId: dto.doctorProfileId,
+      serviceId: dto.serviceId,
+      branchId: dto.branchId,
+    };
+
+    const { appointment, service } = await this.dataSource.transaction(
+      async (manager) => {
+        const slot = await this.availabilityService.resolveSlot(
+          manager,
+          params,
+          dto.date,
+          dto.time,
+        );
+
+        if (!slot) {
+          throw new ConflictException(
+            'The selected time slot is no longer available',
+          );
+        }
+
+        const appointmentRepository = manager.getRepository(AppointmentEntity);
+        const createdAppointment = await appointmentRepository.save(
+          appointmentRepository.create({
+            clinicId: clinic.id,
+            branchId: dto.branchId,
+            doctorProfileId: dto.doctorProfileId,
+            patientId: patient.id,
+            serviceId: dto.serviceId,
+            cabinetId: slot.cabinetId,
+            startsAt: slot.startsAt,
+            endsAt: slot.endsAt,
+            status: AppointmentStatus.PENDING,
+            source: AppointmentSource.ONLINE,
+            price: slot.service.price,
+            comment: dto.comment ?? null,
+          }),
+        );
+
+        await this.createReminders(manager, clinic.id, createdAppointment);
+
+        return { appointment: createdAppointment, service: slot.service };
+      },
+    );
+
+    const doctorName = `${doctor.user.firstName} ${doctor.user.lastName}`;
+    // sendConfirmation/notifyAssignedDoctor/notifyClinicAdmins only read
+    // firstName/lastName/date/time/comment off this shape — this satisfies
+    // that without a real CreateBookingDto (no phone/email form was involved).
+    const bookingLikeDto = {
+      date: dto.date,
+      time: dto.time,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      comment: dto.comment,
+    } as CreateBookingDto;
+
+    await this.sendConfirmation(
+      clinic,
+      bookingLikeDto,
+      service,
+      doctorName,
+      branch,
+      patient,
+    );
+    await this.notifyAssignedDoctor(clinic, doctor, bookingLikeDto, service);
+    await this.notifyClinicAdmins(clinic, doctor, bookingLikeDto, service);
 
     return {
       appointmentId: appointment.id,

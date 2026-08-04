@@ -43,5 +43,6 @@ import { BookingService } from './booking.service';
   ],
   controllers: [BookingController],
   providers: [BookingService, AvailabilityService],
+  exports: [BookingService, AvailabilityService],
 })
 export class BookingModule {}
