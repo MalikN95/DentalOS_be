@@ -93,10 +93,11 @@ export class AppointmentsController {
   @ApiOkResponse({ type: AppointmentEntity })
   updateStatus(
     @CurrentClinic() clinic: ClinicEntity,
+    @CurrentUser('sub') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAppointmentStatusDto,
   ): Promise<AppointmentEntity> {
-    return this.appointmentsService.updateStatus(clinic.id, id, dto);
+    return this.appointmentsService.updateStatus(clinic.id, id, dto, userId);
   }
 
   @Patch(':id')

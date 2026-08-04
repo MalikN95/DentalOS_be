@@ -145,6 +145,7 @@ export class AppointmentsService {
       .leftJoinAndSelect('doctorProfile.user', 'doctorUser')
       .leftJoinAndSelect('appointment.service', 'service')
       .leftJoinAndSelect('appointment.cabinet', 'cabinet')
+      .leftJoinAndSelect('appointment.cancelledBy', 'cancelledBy')
       .where('appointment.clinicId = :clinicId', { clinicId })
       .andWhere('appointment.startsAt < :to', { to })
       .andWhere('appointment.endsAt > :from', { from })
@@ -208,6 +209,7 @@ export class AppointmentsService {
         doctorProfile: { user: true },
         service: true,
         cabinet: true,
+        cancelledBy: true,
       },
     });
 
@@ -342,6 +344,7 @@ export class AppointmentsService {
     clinicId: string,
     id: string,
     dto: UpdateAppointmentStatusDto,
+    actingUserId?: string,
   ): Promise<AppointmentEntity> {
     const appointment = await this.getOwned(clinicId, id);
 
@@ -362,6 +365,7 @@ export class AppointmentsService {
 
     if (dto.status === AppointmentStatus.CANCELLED) {
       appointment.cancellationReason = dto.cancellationReason ?? null;
+      appointment.cancelledByUserId = actingUserId ?? null;
       await this.remindersRepository.update(
         { appointmentId: appointment.id, status: ReminderStatus.PENDING },
         { status: ReminderStatus.CANCELLED },

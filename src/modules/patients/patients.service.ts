@@ -240,6 +240,7 @@ export class PatientsService {
         service: true,
         branch: true,
         cabinet: true,
+        cancelledBy: true,
       },
       order: { startsAt: 'DESC' },
       skip: (page - 1) * limit,

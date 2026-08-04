@@ -7,6 +7,7 @@ import { ClinicEntity } from './clinic.entity';
 import { DoctorProfileEntity } from './doctor-profile.entity';
 import { PatientEntity } from './patient.entity';
 import { ServiceEntity } from './service.entity';
+import { UserEntity } from './user.entity';
 
 export enum AppointmentSource {
   ONLINE = 'online',
@@ -89,4 +90,14 @@ export class AppointmentEntity extends BaseEntity {
 
   @Column({ type: 'varchar', nullable: true })
   cancellationReason: string | null;
+
+  // Who set status -> cancelled: the patient's own UserEntity (portal
+  // self-cancel) or a staff UserEntity (dashboard cancel) — check
+  // `cancelledBy.role` to tell which. Null for any non-cancelled appointment.
+  @Column('uuid', { nullable: true })
+  cancelledByUserId: string | null;
+
+  @ManyToOne(() => UserEntity, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'cancelledByUserId' })
+  cancelledBy: UserEntity | null;
 }

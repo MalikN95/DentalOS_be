@@ -126,7 +126,7 @@ export class PatientPortalService {
     const appointments = await qb.getMany();
 
     return appointments.map((appointment) =>
-      this.toAppointmentSummary(appointment, now),
+      this.toAppointmentSummary(appointment, now, userId),
     );
   }
 
@@ -169,13 +169,16 @@ export class PatientPortalService {
     // `branch` relation (its internal findOne() only loads patient/doctorProfile/
     // service/cabinet) — reuse the already-loaded `appointment` above instead of
     // building the summary off an entity that would render with a blank branch.
-    await this.appointmentsService.updateStatus(clinicId, appointmentId, {
-      status: AppointmentStatus.CANCELLED,
-      cancellationReason,
-    });
+    await this.appointmentsService.updateStatus(
+      clinicId,
+      appointmentId,
+      { status: AppointmentStatus.CANCELLED, cancellationReason },
+      userId,
+    );
 
     appointment.status = AppointmentStatus.CANCELLED;
     appointment.cancellationReason = cancellationReason;
+    appointment.cancelledByUserId = userId;
 
     return this.toAppointmentSummary(appointment, new Date());
   }
