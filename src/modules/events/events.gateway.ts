@@ -6,7 +6,6 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-
 @WebSocketGateway({
   cors: { origin: process.env.CORS_ORIGIN },
   namespace: '/events',
