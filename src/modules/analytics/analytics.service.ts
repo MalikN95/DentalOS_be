@@ -20,8 +20,6 @@ import {
   TopServiceItem,
 } from './types/analytics-results.type';
 
-const TOP_INSURERS_LIMIT = 5;
-
 const LOAD_STATUSES: AppointmentStatus[] = [
   AppointmentStatus.CONFIRMED,
   AppointmentStatus.ARRIVED,
@@ -296,12 +294,11 @@ export class AnalyticsService {
   async getPatientDemographics(clinicId: string): Promise<PatientDemographics> {
     const patients = await this.patientsRepository.find({
       where: { clinicId, isActive: true },
-      select: { gender: true, birthDate: true, insurance: true },
+      select: { gender: true, birthDate: true },
     });
 
     const genderCounts = new Map<string, number>();
     const ageGroupCounts = new Map<string, number>();
-    const insurerCounts = new Map<string, number>();
 
     patients.forEach((patient) => {
       const gender = patient.gender ?? 'unknown';
@@ -309,15 +306,7 @@ export class AnalyticsService {
 
       const ageGroup = this.getAgeGroup(patient.birthDate);
       ageGroupCounts.set(ageGroup, (ageGroupCounts.get(ageGroup) ?? 0) + 1);
-
-      const insurer = patient.insurance?.company?.trim() || 'self_pay';
-      insurerCounts.set(insurer, (insurerCounts.get(insurer) ?? 0) + 1);
     });
-
-    const byInsurer = [...insurerCounts.entries()]
-      .map(([company, count]) => ({ company, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, TOP_INSURERS_LIMIT);
 
     return {
       totalPatients: patients.length,
@@ -327,7 +316,6 @@ export class AnalyticsService {
       byAgeGroup: [...ageGroupCounts.entries()].map(
         ([group, count]) => ({ group, count }) as AgeGroupBreakdownItem,
       ),
-      byInsurer,
     };
   }
 

@@ -62,14 +62,8 @@ export interface AgeGroupBreakdownItem {
   count: number;
 }
 
-export interface InsurerBreakdownItem {
-  company: string;
-  count: number;
-}
-
 export interface PatientDemographics {
   totalPatients: number;
   byGender: GenderBreakdownItem[];
   byAgeGroup: AgeGroupBreakdownItem[];
-  byInsurer: InsurerBreakdownItem[];
 }
