@@ -1,20 +1,28 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
   IsNotEmpty,
-  IsObject,
   IsOptional,
   IsString,
   Length,
+  Matches,
 } from 'class-validator';
-import type { WorkingHours } from '../../../common/types/working-hours.type';
 
-export class UpdateClinicDto {
+export class UpdateClinicAdminDto {
   @ApiPropertyOptional({ example: 'Bright Smile Dental' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   name?: string;
+
+  @ApiPropertyOptional({ example: 'bright-smile' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-z0-9-]+$/, {
+    message: 'slug may only contain lowercase letters, numbers and hyphens',
+  })
+  slug?: string;
 
   @ApiPropertyOptional({ example: '221B Baker Street' })
   @IsOptional()
@@ -30,15 +38,6 @@ export class UpdateClinicDto {
   @IsOptional()
   @IsEmail()
   email?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Weekly schedule, e.g. { "mon": { "from": "09:00", "to": "18:00" }, ..., "sun": null }',
-    type: Object,
-  })
-  @IsOptional()
-  @IsObject()
-  workingHours?: WorkingHours;
 
   @ApiPropertyOptional({ example: 'Asia/Tashkent' })
   @IsOptional()
@@ -58,10 +57,10 @@ export class UpdateClinicDto {
   language?: string;
 
   @ApiPropertyOptional({
-    description: 'S3 object key returned by POST /clinic/logo-upload',
-    example: 'clinics/6f1d.../logo',
+    description: 'Block (false) or unblock (true) the clinic platform-wide',
+    example: true,
   })
   @IsOptional()
-  @IsString()
-  logoKey?: string;
+  @IsBoolean()
+  isActive?: boolean;
 }

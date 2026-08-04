@@ -14,12 +14,13 @@ import { ClinicEntity } from './clinic.entity';
   where: `"role" != 'patient'`,
 })
 export class UserEntity extends BaseEntity {
-  @Column('uuid')
-  clinicId: string;
+  // Nullable: super_admin accounts are platform-wide and belong to no clinic.
+  @Column('uuid', { nullable: true })
+  clinicId: string | null;
 
-  @ManyToOne(() => ClinicEntity, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ClinicEntity, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'clinicId' })
-  clinic: ClinicEntity;
+  clinic: ClinicEntity | null;
 
   @Column()
   email: string;

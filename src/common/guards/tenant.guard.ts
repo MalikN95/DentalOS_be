@@ -23,6 +23,12 @@ export class TenantGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<RequestWithTenant>();
 
     if (request.user) {
+      // super_admin (and any other clinic-less role) has nothing to resolve —
+      // @CurrentClinic() throws for those if a handler tries to use it anyway.
+      if (!request.user.clinicId) {
+        return true;
+      }
+
       const clinic = await this.clinicsService.findById(request.user.clinicId);
 
       if (!clinic) {

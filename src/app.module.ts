@@ -31,6 +31,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PatientPortalModule } from './modules/patient-portal/patient-portal.module';
 import { PatientTagsModule } from './modules/patient-tags/patient-tags.module';
 import { PatientsModule } from './modules/patients/patients.module';
+import { PlatformAdminModule } from './modules/platform-admin/platform-admin.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
@@ -56,6 +57,7 @@ import { UsersModule } from './modules/users/users.module';
     AuditModule,
     HealthModule,
     ClinicsModule,
+    PlatformAdminModule,
     UsersModule,
     AuthModule,
     BranchesModule,

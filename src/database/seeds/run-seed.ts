@@ -11,6 +11,7 @@ import { seedRandomPatients } from './seed-random-patients';
 import { seedReviews } from './seed-reviews';
 import { seedServices } from './seed-services';
 import { seedStaff } from './seed-staff';
+import { seedSuperAdminUser } from './seed-super-admin';
 
 const runSeed = async (): Promise<void> => {
   const config = getSeedConfig();
@@ -21,6 +22,7 @@ const runSeed = async (): Promise<void> => {
 
   try {
     await seedAdminUser(dataSource);
+    await seedSuperAdminUser(dataSource);
     await seedBranches(dataSource);
     await seedStaff(dataSource);
     await seedPatients(dataSource);
@@ -37,6 +39,10 @@ const runSeed = async (): Promise<void> => {
     console.log(`Admin login: ${config.adminEmail} / ${config.adminPassword}`);
     // eslint-disable-next-line no-console -- seed CLI output
     console.log(`Staff password: ${config.staffPassword}`);
+    // eslint-disable-next-line no-console -- seed CLI output
+    console.log(
+      `Super admin login: ${config.superAdminEmail} / ${config.superAdminPassword}`,
+    );
     // eslint-disable-next-line no-console -- seed CLI output
     console.log('Login: http://localhost:3000/login');
     // eslint-disable-next-line no-console -- seed CLI output

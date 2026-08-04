@@ -95,7 +95,7 @@ export class NotificationsService {
         this.send(NotificationChannel.IN_APP, {
           to: user.id,
           ...message,
-          clinicId: user.clinicId,
+          clinicId: user.clinicId ?? undefined,
         }),
       );
     }

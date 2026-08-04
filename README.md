@@ -72,7 +72,9 @@ In production migrations run automatically at startup (`migrationsRun: true`).
 
 ## Seeding
 
-`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/`, run in order: `seed-clinic` → `seed-admin` → `seed-branches` → `seed-staff` → `seed-patients` → `seed-random-patients` → `seed-services` → `seed-cabinets` → `seed-appointments` → `seed-invoices` → `seed-leads`. All seeders are idempotent — reruns never duplicate rows.
+`npm run seed` populates a demo tenant via the shared seeders in `src/database/seeds/`, run in order: `seed-clinic` → `seed-admin` → `seed-super-admin` → `seed-branches` → `seed-staff` → `seed-patients` → `seed-random-patients` → `seed-services` → `seed-cabinets` → `seed-appointments` → `seed-invoices` → `seed-leads`. All seeders are idempotent — reruns never duplicate rows.
+
+`seed-super-admin` creates a single platform-wide `super_admin` account (`clinicId: null` — see Platform admin below), credentials via `SEED_SUPER_ADMIN_EMAIL`/`SEED_SUPER_ADMIN_PASSWORD` (default `superadmin@dentalos.local` / `SuperAdmin12345`).
 
 The same seeders run automatically on application boot when `SEED_ON_START=true` (see `SeedModule` → `SeedService.onApplicationBootstrap`). Handy for a fresh Docker/dev database.
 
@@ -97,6 +99,7 @@ src/
     users/        # users per clinic
     staff/        # employees CRUD (/api/staff) incl. the doctor profile
     clinics/      # clinic settings, branches, cabinets, equipment
+    platform-admin/ # cross-clinic super_admin CRUD + platform-wide stats (/api/platform/*)
     audit/        # audit log (global)
     events/       # WebSocket gateway (global)
     storage/      # S3 presigned URLs (global)
@@ -123,6 +126,18 @@ There is no per-clinic subdomain — every clinic's staff/owner/admin logs into 
 4. `POST /api/auth/logout` revokes the refresh token
 
 All routes are protected by default (global guard); public routes are marked with `@Public()`. Role checks via `@Roles(UserRole.DOCTOR)`.
+
+## Platform admin (`/api/platform/*`)
+
+A `super_admin` role sits above the per-clinic tenancy model above — it manages clinics across the whole platform rather than belonging to one.
+
+- `UserEntity.clinicId` (and `JwtPayload.clinicId`) is **nullable** — a `super_admin` account has no home clinic (migration `NullableUserClinicId...`). `TenantGuard` skips clinic resolution entirely when the authenticated user has no `clinicId`, instead of throwing "Clinic not found".
+- `PlatformAdminModule` (`modules/platform-admin/`) is entirely separate from the tenant-scoped `ClinicsModule` — deliberately not sharing a service, since the two have different invariants (see below):
+  - `ClinicsAdminController`/`Service` (`@Roles(UserRole.SUPER_ADMIN)`) — `GET/POST /platform/clinics` (paginated list with search/`isActive` filter, and create), `GET/PATCH/DELETE /platform/clinics/:id` (detail with doctor/patient counts + total revenue, partial update, soft delete). The list/detail reads never filter by `isActive` — a super_admin has to see and manage blocked clinics too, unlike `ClinicsService.findById`/`findBySlug` which only resolve active ones.
+  - **Creating a clinic also creates its first user** — `CreateClinicAdminDto.admin` (`CreateClinicAdminUserDto`: firstName/lastName/email/phone?/password, `@IsDefined()` + `@ValidateNested()` so a missing/malformed nested object is a clean `400`, not a crash) is required: a clinic with nobody able to log into it would be unreachable dead weight. `ClinicsAdminService.create()` checks the admin email is free (globally unique across every clinic, same rule as staff logins) *before* opening a transaction, then creates the `ClinicEntity` and a `UserEntity` (`role: OWNER`, bcrypt-hashed password) together via `dataSource.transaction(...)` — both succeed or neither does.
+  - `StatsAdminController`/`Service` — `GET /platform/stats/overview` (clinic/doctor/patient counts, total revenue), `GET /platform/stats/revenue-by-month` / `/clinics-growth` (`?months=`, default 12, zero-filled for months with no rows). Same `createQueryBuilder` raw-aggregate style as `AnalyticsService`, just without a `clinicId` filter.
+- **Blocking a clinic** reuses the existing `ClinicEntity.isActive` flag — no new column. `PATCH /platform/clinics/:id { "isActive": false }` is "block"; since `ClinicsService.findById`/`findBySlug` already only resolve `isActive: true` clinics, a blocked clinic's staff immediately fail login (`TenantGuard`/`UsersService.findStaffByEmailWithPassword`'s clinic-agnostic path still finds the user, but a resolved clinic check downstream fails — see `clinics-admin.service.ts`'s doc comment) and its public booking widget 404s. Correspondingly, `isActive` was **removed** from the self-service `UpdateClinicDto` (`PATCH /clinic`) — a clinic owner/admin can no longer unblock themselves; only a super_admin can flip it back.
+- Creating/renaming a clinic checks slug uniqueness **including soft-deleted rows** (`withDeleted: true`) — the DB's `UNIQUE` constraint on `slug` doesn't know about soft-delete, so a slug held by a soft-deleted clinic is still taken; the app-level check has to agree or the insert 500s instead of returning a clean `409`.
 
 ## Notifications
 
