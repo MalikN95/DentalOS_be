@@ -4,17 +4,23 @@ import { Repository } from 'typeorm';
 import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { LeadEntity, LeadStage } from '../../entities/lead.entity';
+import { PatientEntity } from '../../entities/patient.entity';
 import { PaymentEntity, PaymentMethod } from '../../entities/payment.entity';
 import { RefundEntity } from '../../entities/refund.entity';
 import { PeriodQueryDto } from './dto/period-query.dto';
 import {
+  AgeGroupBreakdownItem,
   CancellationsAnalytics,
   ConversionAnalytics,
   DoctorLoadItem,
+  GenderBreakdownItem,
+  PatientDemographics,
   RepeatVisitsAnalytics,
   RevenueAnalytics,
   TopServiceItem,
 } from './types/analytics-results.type';
+
+const TOP_INSURERS_LIMIT = 5;
 
 const LOAD_STATUSES: AppointmentStatus[] = [
   AppointmentStatus.CONFIRMED,
@@ -39,6 +45,8 @@ export class AnalyticsService {
     private readonly appointmentsRepository: Repository<AppointmentEntity>,
     @InjectRepository(LeadEntity)
     private readonly leadsRepository: Repository<LeadEntity>,
+    @InjectRepository(PatientEntity)
+    private readonly patientsRepository: Repository<PatientEntity>,
   ) {}
 
   async getRevenue(
@@ -283,6 +291,64 @@ export class AnalyticsService {
       cancellationRate: total > 0 ? this.round(cancelled / total) : 0,
       noShowRate: total > 0 ? this.round(noShow / total) : 0,
     };
+  }
+
+  async getPatientDemographics(clinicId: string): Promise<PatientDemographics> {
+    const patients = await this.patientsRepository.find({
+      where: { clinicId, isActive: true },
+      select: { gender: true, birthDate: true, insurance: true },
+    });
+
+    const genderCounts = new Map<string, number>();
+    const ageGroupCounts = new Map<string, number>();
+    const insurerCounts = new Map<string, number>();
+
+    patients.forEach((patient) => {
+      const gender = patient.gender ?? 'unknown';
+      genderCounts.set(gender, (genderCounts.get(gender) ?? 0) + 1);
+
+      const ageGroup = this.getAgeGroup(patient.birthDate);
+      ageGroupCounts.set(ageGroup, (ageGroupCounts.get(ageGroup) ?? 0) + 1);
+
+      const insurer = patient.insurance?.company?.trim() || 'self_pay';
+      insurerCounts.set(insurer, (insurerCounts.get(insurer) ?? 0) + 1);
+    });
+
+    const byInsurer = [...insurerCounts.entries()]
+      .map(([company, count]) => ({ company, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, TOP_INSURERS_LIMIT);
+
+    return {
+      totalPatients: patients.length,
+      byGender: [...genderCounts.entries()].map(
+        ([gender, count]) => ({ gender, count }) as GenderBreakdownItem,
+      ),
+      byAgeGroup: [...ageGroupCounts.entries()].map(
+        ([group, count]) => ({ group, count }) as AgeGroupBreakdownItem,
+      ),
+      byInsurer,
+    };
+  }
+
+  private getAgeGroup(
+    birthDate: string | null,
+  ): AgeGroupBreakdownItem['group'] {
+    if (!birthDate) return 'unknown';
+
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const hasHadBirthdayThisYear =
+      today.getMonth() > birth.getMonth() ||
+      (today.getMonth() === birth.getMonth() &&
+        today.getDate() >= birth.getDate());
+    if (!hasHadBirthdayThisYear) age -= 1;
+
+    if (age < 18) return '0-17';
+    if (age < 35) return '18-34';
+    if (age < 55) return '35-54';
+    return '55+';
   }
 
   private parsePeriod(query: PeriodQueryDto): Period {

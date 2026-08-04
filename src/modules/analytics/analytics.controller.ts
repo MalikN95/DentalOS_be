@@ -10,6 +10,7 @@ import {
   CancellationsAnalytics,
   ConversionAnalytics,
   DoctorLoadItem,
+  PatientDemographics,
   RepeatVisitsAnalytics,
   RevenueAnalytics,
   TopServiceItem,
@@ -68,5 +69,12 @@ export class AnalyticsController {
     @Query() query: PeriodQueryDto,
   ): Promise<CancellationsAnalytics> {
     return this.analyticsService.getCancellations(clinic.id, query);
+  }
+
+  @Get('patients')
+  getPatientDemographics(
+    @CurrentClinic() clinic: ClinicEntity,
+  ): Promise<PatientDemographics> {
+    return this.analyticsService.getPatientDemographics(clinic.id);
   }
 }

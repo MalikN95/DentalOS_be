@@ -51,3 +51,25 @@ export interface CancellationsAnalytics {
   cancellationRate: number;
   noShowRate: number;
 }
+
+export interface GenderBreakdownItem {
+  gender: 'male' | 'female' | 'other' | 'unknown';
+  count: number;
+}
+
+export interface AgeGroupBreakdownItem {
+  group: '0-17' | '18-34' | '35-54' | '55+' | 'unknown';
+  count: number;
+}
+
+export interface InsurerBreakdownItem {
+  company: string;
+  count: number;
+}
+
+export interface PatientDemographics {
+  totalPatients: number;
+  byGender: GenderBreakdownItem[];
+  byAgeGroup: AgeGroupBreakdownItem[];
+  byInsurer: InsurerBreakdownItem[];
+}
