@@ -40,6 +40,7 @@ import { ServicesModule } from './modules/services/services.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
+import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { UsersModule } from './modules/users/users.module';
     EquipmentModule,
     ChatModule,
     PatientPortalModule,
+    WhatsAppModule,
     SeedModule,
   ],
   providers: [

@@ -7,6 +7,7 @@ import {
   PatientMessageDirection,
   PatientMessageEntity,
 } from '../../entities/patient-message.entity';
+import { PatientEntity } from '../../entities/patient.entity';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import {
   ChatMessageSummary,
@@ -42,6 +43,8 @@ export class ChatService {
     private readonly chatMessagesRepository: Repository<ChatMessageEntity>,
     @InjectRepository(PatientMessageEntity)
     private readonly patientMessagesRepository: Repository<PatientMessageEntity>,
+    @InjectRepository(PatientEntity)
+    private readonly patientsRepository: Repository<PatientEntity>,
   ) {}
 
   async listTeamMessages(
@@ -183,6 +186,54 @@ export class ChatService {
     );
 
     return this.toPatientMessageSummary(saved);
+  }
+
+  // Inbound WhatsApp message from Meta's webhook (WhatsAppWebhookController).
+  // `from` is the sender's wa_id (digits only, country code, no '+'); matched
+  // against patient.phone with non-digit characters stripped since staff enter
+  // phone numbers in inconsistent formats. Swallows errors like
+  // logPatientMessage — Meta expects a 200 regardless, and retries the same
+  // payload on a non-2xx, which would just duplicate the message.
+  //
+  // Caveat: WhatsApp is configured as a single number for the whole platform
+  // (WHATSAPP_PHONE_NUMBER_ID is a global env var, not per-clinic), so if two
+  // clinics share this deployment and both have a patient with the same
+  // phone, the match is ambiguous — this picks the most recently created one.
+  async receiveWhatsAppMessage(from: string, body: string): Promise<void> {
+    try {
+      const digits = from.replace(/[^\d]/g, '');
+      const patient = await this.patientsRepository
+        .createQueryBuilder('patient')
+        .where("regexp_replace(patient.phone, '[^0-9]', '', 'g') = :digits", {
+          digits,
+        })
+        .orderBy('patient.createdAt', 'DESC')
+        .getOne();
+
+      if (!patient) {
+        this.logger.warn(
+          `Received WhatsApp message from unknown number (from=${from})`,
+        );
+        return;
+      }
+
+      await this.patientMessagesRepository.save(
+        this.patientMessagesRepository.create({
+          clinicId: patient.clinicId,
+          patientId: patient.id,
+          channel: PatientMessageChannel.WHATSAPP,
+          direction: PatientMessageDirection.INBOUND,
+          subject: null,
+          body,
+          sentByUserId: null,
+        }),
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to store inbound WhatsApp message (from=${from}): ${reason}`,
+      );
+    }
   }
 
   private buildPreview(body: string): string {

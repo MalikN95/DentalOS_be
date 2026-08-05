@@ -42,6 +42,8 @@ export const envValidationSchema = Joi.object({
   WHATSAPP_PHONE_NUMBER_ID: Joi.string().allow('').optional(),
   WHATSAPP_BUSINESS_ACCOUNT_ID: Joi.string().allow('').optional(),
   WHATSAPP_API_VERSION: Joi.string().default('v21.0'),
+  WHATSAPP_VERIFY_TOKEN: Joi.string().allow('').optional(),
+  WHATSAPP_APP_SECRET: Joi.string().allow('').optional(),
 
   // Firebase Cloud Messaging (web push) — optional; the FCM sender no-ops
   // (logs a warning) until these are set.
