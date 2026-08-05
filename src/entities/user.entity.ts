@@ -45,6 +45,10 @@ export class UserEntity extends BaseEntity {
   @Column()
   lastName: string;
 
+  // S3 object key for the profile photo, download via presigned URL
+  @Column({ nullable: true, type: 'varchar' })
+  avatarKey: string | null;
+
   @Column({ type: 'enum', enum: UserRole, default: UserRole.RECEPTIONIST })
   role: UserRole;
 

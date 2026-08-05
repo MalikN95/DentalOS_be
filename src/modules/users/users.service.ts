@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -85,6 +85,28 @@ export class UsersService {
 
   async updateRefreshJti(userId: string, jti: string | null): Promise<void> {
     await this.usersRepository.update({ id: userId }, { refreshJti: jti });
+  }
+
+  async updateProfile(
+    userId: string,
+    patch: { firstName?: string; lastName?: string; avatarKey?: string },
+  ): Promise<UserEntity> {
+    // Only apply provided fields — an omitted field must stay untouched, not
+    // get wiped by a blind save of an entity with undefined columns.
+    const definedFields = Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined),
+    );
+    await this.usersRepository.update({ id: userId }, definedFields);
+
+    const updated = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+
+    return updated;
   }
 
   async findRefreshJti(userId: string): Promise<string | null> {

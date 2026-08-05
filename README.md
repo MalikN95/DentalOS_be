@@ -127,6 +127,14 @@ There is no per-clinic subdomain — every clinic's staff/owner/admin logs into 
 
 All routes are protected by default (global guard); public routes are marked with `@Public()`. Role checks via `@Roles(UserRole.DOCTOR)`.
 
+### Self-profile (`/api/auth/me`)
+
+Any authenticated user (own account only, no `@Roles()` restriction) can read/edit their own name and photo — separate from the admin-only `PATCH /api/staff/:id` used to edit *other* staff:
+
+- `GET /api/auth/me` / `PATCH /api/auth/me` (`UpdateProfileDto`: `firstName?`, `lastName?`, `avatarKey?`) — both return `MeResponse` (`AuthService.getMe`/`updateProfile`), which derives `avatarUrl` from `UserEntity.avatarKey` the same way `ClinicsService` derives `logoUrl` from `logoKey`.
+- `POST /api/auth/me/avatar-upload` (`AvatarUploadDto: { contentType }`) — presigned S3 PUT URL, mirrors `POST /clinic/logo-upload`; key is `users/{userId}/avatar`. The frontend PUTs the file directly to S3, then persists the returned key via `PATCH /api/auth/me { avatarKey }`.
+- Login itself still only returns tokens (no profile) — the frontend calls `GET /auth/me` once per session to hydrate the real name/avatar (see `DentalOS_fe/src/hooks/useSyncProfileFromServer.ts`).
+
 ## Platform admin (`/api/platform/*`)
 
 A `super_admin` role sits above the per-clinic tenancy model above — it manages clinics across the whole platform rather than belonging to one.
