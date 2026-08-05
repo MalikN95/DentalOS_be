@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,6 +20,7 @@ import {
   appointmentCancelledAdminCopy,
   appointmentCancelledDoctorCopy,
   appointmentCancelledPatientCopy,
+  appointmentConfirmedPatientCopy,
   appointmentRescheduledDoctorCopy,
   appointmentRescheduledPatientCopy,
 } from '../../common/notifications/notification-copy';
@@ -88,6 +90,8 @@ const formatLocalDate = (date: Date): string => {
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
+
   constructor(
     @InjectRepository(AppointmentEntity)
     private readonly appointmentsRepository: Repository<AppointmentEntity>,
@@ -335,7 +339,15 @@ export class AppointmentsService {
     await this.saveAppointment(appointment);
 
     const updated = await this.findOne(clinicId, id);
-    await this.notifyRescheduled(clinicId, updated, previousStartsAt);
+
+    this.notifyRescheduled(clinicId, updated, previousStartsAt).catch(
+      (error) => {
+        this.logger.error(
+          `notifyRescheduled failed for appointment ${updated.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      },
+    );
 
     return updated;
   }
@@ -375,7 +387,17 @@ export class AppointmentsService {
     await this.appointmentsRepository.save(appointment);
 
     const updated = await this.findOne(clinicId, id);
-    await this.notifyStatusChange(clinicId, updated, previousStatus);
+
+    // Fire-and-forget: the caller (reception/patient) shouldn't wait on
+    // email/whatsapp/push round-trips just to get the status-change response.
+    this.notifyStatusChange(clinicId, updated, previousStatus).catch(
+      (error) => {
+        this.logger.error(
+          `notifyStatusChange failed for appointment ${updated.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      },
+    );
 
     return updated;
   }
@@ -412,6 +434,17 @@ export class AppointmentsService {
       await this.notificationsService.notifyStaffMember(doctorProfile.user, {
         ...appointmentArrivedCopy(locale, {
           patientName,
+          serviceName: service.name,
+          when,
+        }),
+        clinicName,
+      });
+      return;
+    }
+
+    if (appointment.status === AppointmentStatus.CONFIRMED) {
+      await this.notificationsService.notifyPatient(patient, {
+        ...appointmentConfirmedPatientCopy(locale, {
           serviceName: service.name,
           when,
         }),

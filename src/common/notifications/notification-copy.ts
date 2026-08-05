@@ -5,7 +5,7 @@ export interface NotificationCopy {
   body: string;
 }
 
-interface BookingConfirmationParams {
+interface BookingCreatedParams {
   clinicName: string;
   date: string;
   time: string;
@@ -15,13 +15,17 @@ interface BookingConfirmationParams {
   preparation?: string | null;
 }
 
-export const bookingConfirmationCopy = (
+// Sent the moment an online booking is created — the appointment is still
+// `pending` at this point (staff confirm it later, which fires
+// appointmentConfirmedPatientCopy instead), so this deliberately says
+// "received", not "confirmed".
+export const bookingCreatedCopy = (
   locale: NotificationLocale,
-  p: BookingConfirmationParams,
+  p: BookingCreatedParams,
 ): NotificationCopy => {
   if (locale === 'en') {
     const lines = [
-      `${p.clinicName}: your appointment is confirmed.`,
+      `${p.clinicName}: we've received your appointment request.`,
       `Date: ${p.date} ${p.time}`,
       `Service: ${p.serviceName}`,
       `Doctor: ${p.doctorName}`,
@@ -29,14 +33,14 @@ export const bookingConfirmationCopy = (
     ];
     if (p.preparation) lines.push(`Preparation: ${p.preparation}`);
     return {
-      subject: `Appointment confirmation — ${p.clinicName}`,
+      subject: `Booking received — ${p.clinicName}`,
       body: lines.join('\n'),
     };
   }
 
   if (locale === 'ky') {
     const lines = [
-      `${p.clinicName}: жазылууңуз ырасталды.`,
+      `${p.clinicName}: жазылуу сурооңуз кабыл алынды.`,
       `Күнү: ${p.date} ${p.time}`,
       `Кызмат: ${p.serviceName}`,
       `Дарыгер: ${p.doctorName}`,
@@ -44,13 +48,13 @@ export const bookingConfirmationCopy = (
     ];
     if (p.preparation) lines.push(`Даярдануу: ${p.preparation}`);
     return {
-      subject: `Жазылууну ырастоо — ${p.clinicName}`,
+      subject: `Жазылуу кабыл алынды — ${p.clinicName}`,
       body: lines.join('\n'),
     };
   }
 
   const lines = [
-    `${p.clinicName}: ваша запись подтверждена.`,
+    `${p.clinicName}: ваша запись создана и ожидает подтверждения клиникой.`,
     `Дата: ${p.date} ${p.time}`,
     `Услуга: ${p.serviceName}`,
     `Врач: ${p.doctorName}`,
@@ -58,7 +62,7 @@ export const bookingConfirmationCopy = (
   ];
   if (p.preparation) lines.push(`Подготовка: ${p.preparation}`);
   return {
-    subject: `Подтверждение записи — ${p.clinicName}`,
+    subject: `Запись создана — ${p.clinicName}`,
     body: lines.join('\n'),
   };
 };
@@ -134,6 +138,28 @@ export const appointmentArrivedCopy = (
   return {
     subject: 'Пациент пришёл',
     body: `${p.patientName} пришёл(-ла) на приём (${p.serviceName}, ${p.when}).`,
+  };
+};
+
+export const appointmentConfirmedPatientCopy = (
+  locale: NotificationLocale,
+  p: { serviceName: string; when: string },
+): NotificationCopy => {
+  if (locale === 'en') {
+    return {
+      subject: 'Appointment confirmed',
+      body: `Your appointment on ${p.when} (${p.serviceName}) has been confirmed.`,
+    };
+  }
+  if (locale === 'ky') {
+    return {
+      subject: 'Кабылдоо ырасталды',
+      body: `Сиздин ${p.when} убактысындагы кабылдооңуз (${p.serviceName}) ырасталды.`,
+    };
+  }
+  return {
+    subject: 'Приём подтверждён',
+    body: `Ваш приём ${p.when} (${p.serviceName}) подтверждён.`,
   };
 };
 

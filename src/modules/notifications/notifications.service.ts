@@ -49,7 +49,14 @@ export class NotificationsService {
       return;
     }
 
-    await sender.send(message);
+    try {
+      await sender.send(message);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send ${channel} notification to ${message.to}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   async sendToMany(

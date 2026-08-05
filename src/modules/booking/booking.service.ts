@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,7 +11,7 @@ import { AppointmentStatus } from '../../common/enums/appointment-status.enum';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
 import { findClinicAdmins } from '../../common/helpers/find-clinic-admins.helper';
 import {
-  bookingConfirmationCopy,
+  bookingCreatedCopy,
   newBookingAdminCopy,
   newBookingDoctorCopy,
 } from '../../common/notifications/notification-copy';
@@ -53,6 +54,8 @@ const LEAD_SOURCE_ONLINE_BOOKING = 'online_booking';
 
 @Injectable()
 export class BookingService {
+  private readonly logger = new Logger(BookingService.name);
+
   constructor(
     @InjectRepository(BranchEntity)
     private readonly branchRepository: Repository<BranchEntity>,
@@ -370,16 +373,15 @@ export class BookingService {
 
     const doctorName = `${doctor.user.firstName} ${doctor.user.lastName}`;
 
-    await this.sendConfirmation(
+    this.dispatchBookingNotifications(
       clinic,
       dto,
       service,
       doctorName,
       branch,
       patient,
+      doctor,
     );
-    await this.notifyAssignedDoctor(clinic, doctor, dto, service);
-    await this.notifyClinicAdmins(clinic, doctor, dto, service);
 
     return {
       appointmentId: appointment.id,
@@ -503,16 +505,15 @@ export class BookingService {
       comment: dto.comment,
     } as CreateBookingDto;
 
-    await this.sendConfirmation(
+    this.dispatchBookingNotifications(
       clinic,
       bookingLikeDto,
       service,
       doctorName,
       branch,
       patient,
+      doctor,
     );
-    await this.notifyAssignedDoctor(clinic, doctor, bookingLikeDto, service);
-    await this.notifyClinicAdmins(clinic, doctor, bookingLikeDto, service);
 
     return {
       appointmentId: appointment.id,
@@ -558,7 +559,48 @@ export class BookingService {
     }
   }
 
-  private async sendConfirmation(
+  // Fire-and-forget: the patient shouldn't wait on email/whatsapp/push
+  // round-trips just to get their booking confirmation response.
+  private dispatchBookingNotifications(
+    clinic: ClinicEntity,
+    dto: CreateBookingDto,
+    service: ServiceEntity,
+    doctorName: string,
+    branch: BranchEntity,
+    patient: PatientEntity,
+    doctor: DoctorProfileEntity,
+  ): void {
+    Promise.allSettled([
+      this.sendBookingCreatedNotice(
+        clinic,
+        dto,
+        service,
+        doctorName,
+        branch,
+        patient,
+      ),
+      this.notifyAssignedDoctor(clinic, doctor, dto, service),
+      this.notifyClinicAdmins(clinic, doctor, dto, service),
+    ])
+      .then((results) => {
+        results.forEach((result) => {
+          if (result.status === 'rejected') {
+            this.logger.error(
+              'Booking notification dispatch failed',
+              result.reason,
+            );
+          }
+        });
+      })
+      .catch((error) => {
+        this.logger.error(
+          'Booking notification dispatch failed',
+          error instanceof Error ? error.stack : String(error),
+        );
+      });
+  }
+
+  private async sendBookingCreatedNotice(
     clinic: ClinicEntity,
     dto: CreateBookingDto,
     service: ServiceEntity,
@@ -567,7 +609,7 @@ export class BookingService {
     patient: PatientEntity,
   ): Promise<void> {
     const locale = resolveNotificationLocale(clinic.language);
-    const { subject, body } = bookingConfirmationCopy(locale, {
+    const { subject, body } = bookingCreatedCopy(locale, {
       clinicName: clinic.name,
       date: dto.date,
       time: dto.time,
