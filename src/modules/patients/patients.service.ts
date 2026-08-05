@@ -38,7 +38,9 @@ export class PatientsService {
 
   // Dev/QA convenience only — see OtpCodeEntity#devPlainCode. Returns null in
   // any real deployment (the column is only ever populated there), and null
-  // once the patient's current code has been used or has expired.
+  // once the patient's current login link has been used or has expired.
+  // `code` holds the full magic-link URL now, not a short code — kept as-is
+  // to avoid an unrelated API rename.
   async getDevLoginCode(
     clinicId: string,
     patientId: string,

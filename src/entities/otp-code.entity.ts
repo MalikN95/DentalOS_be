@@ -7,14 +7,19 @@ export enum OtpPurpose {
   MFA = 'mfa',
 }
 
-// Short-lived one-time codes for SMS login / email verification / MFA fallback
+// Short-lived one-time codes/tokens for SMS login / email verification / MFA
+// fallback. `purpose` decides both what's hashed into `codeHash` and how:
+// SMS_LOGIN stores a SHA-256 hex digest of a random magic-link token (direct
+// equality lookup by hash, no destination needed to find it — see
+// SmsAuthService#verifyLoginLink); EMAIL_VERIFICATION/MFA still store a
+// bcrypt hash of a short numeric code, looked up by (clinicId, destination).
 @Entity('otp_codes')
 @Index(['destination', 'purpose'])
 export class OtpCodeEntity extends BaseEntity {
   @Column('uuid')
   clinicId: string;
 
-  // Phone number or email the code was sent to
+  // Phone number or email the code/token was sent to
   @Column()
   destination: string;
 
@@ -33,10 +38,11 @@ export class OtpCodeEntity extends BaseEntity {
   @Column({ default: false })
   isUsed: boolean;
 
-  // Dev/QA convenience only: the plaintext code, populated by SmsAuthService
-  // ONLY when WhatsApp isn't actually configured and NODE_ENV isn't
-  // 'production' (see SmsAuthService#shouldExposeDevPlainCode). Null in any
-  // real deployment — staff can never read a patient's real login code.
+  // Dev/QA convenience only: the plaintext code/token, populated by
+  // SmsAuthService/AuthService ONLY when WhatsApp isn't actually configured
+  // and NODE_ENV isn't 'production' (see SmsAuthService#shouldExposeDevPlainCode).
+  // Null in any real deployment — staff can never read a patient's real
+  // login token.
   @Column({ type: 'varchar', nullable: true })
   devPlainCode: string | null;
 }

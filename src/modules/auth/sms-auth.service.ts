@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   BadRequestException,
   Injectable,
@@ -6,22 +6,22 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { compare as bcryptCompare, hash as bcryptHash } from 'bcrypt';
 import { MoreThan, Repository } from 'typeorm';
 import { NotificationChannel } from '../../common/enums/notification-channel.enum';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { magicLinkLoginCopy } from '../../common/notifications/notification-copy';
+import { resolveNotificationLocale } from '../../common/notifications/notification-locale';
 import { OtpCodeEntity, OtpPurpose } from '../../entities/otp-code.entity';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { UserEntity } from '../../entities/user.entity';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { TokensDto } from './dto/tokens.dto';
 
-const CODE_TTL_MS = 5 * 60 * 1000;
+const LINK_TTL_MS = 15 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
-const MAX_ATTEMPTS = 5;
-const BCRYPT_ROUNDS = 10;
 
 @Injectable()
 export class SmsAuthService {
@@ -51,24 +51,24 @@ export class SmsAuthService {
     return !hasWhatsAppCredentials;
   }
 
-  async requestCode(clinicId: string, phone: string): Promise<void> {
-    const recentCode = await this.otpRepository.findOne({
+  async requestLoginLink(clinic: ClinicEntity, phone: string): Promise<void> {
+    const recentLink = await this.otpRepository.findOne({
       where: {
-        clinicId,
+        clinicId: clinic.id,
         destination: phone,
         purpose: OtpPurpose.SMS_LOGIN,
         createdAt: MoreThan(new Date(Date.now() - RESEND_COOLDOWN_MS)),
       },
     });
 
-    if (recentCode) {
+    if (recentLink) {
       throw new BadRequestException('Too many requests');
     }
 
-    // Only one live code per phone: invalidate previous ones
+    // Only one live link per phone: invalidate previous ones
     await this.otpRepository.update(
       {
-        clinicId,
+        clinicId: clinic.id,
         destination: phone,
         purpose: OtpPurpose.SMS_LOGIN,
         isUsed: false,
@@ -76,63 +76,62 @@ export class SmsAuthService {
       { isUsed: true },
     );
 
-    const code = randomInt(0, 10_000).toString().padStart(4, '0');
-    const codeHash = await bcryptHash(code, BCRYPT_ROUNDS);
+    const token = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const link = this.buildLoginLink(clinic.slug, token);
 
     await this.otpRepository.save(
       this.otpRepository.create({
-        clinicId,
+        clinicId: clinic.id,
         destination: phone,
         purpose: OtpPurpose.SMS_LOGIN,
-        codeHash,
-        expiresAt: new Date(Date.now() + CODE_TTL_MS),
-        devPlainCode: this.shouldExposeDevPlainCode() ? code : null,
+        codeHash: tokenHash,
+        expiresAt: new Date(Date.now() + LINK_TTL_MS),
+        // The full clickable link, not just the token — more useful for the
+        // staff kabinet's dev/QA row (PatientInfoPanel#DevLoginCodeRow).
+        devPlainCode: this.shouldExposeDevPlainCode() ? link : null,
       }),
     );
 
+    const locale = resolveNotificationLocale(clinic.language);
+    const copy = magicLinkLoginCopy(locale, { link });
+
     await this.notificationsService.send(NotificationChannel.WHATSAPP, {
       to: phone,
-      body: `Код входа: ${code}`,
+      body: copy.body,
     });
   }
 
-  async verifyCode(
-    clinicId: string,
-    phone: string,
-    code: string,
-  ): Promise<TokensDto> {
+  async verifyLoginLink(token: string): Promise<TokensDto> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+
     const otp = await this.otpRepository
       .createQueryBuilder('otp')
       .addSelect('otp.codeHash')
-      .where('otp.clinicId = :clinicId', { clinicId })
-      .andWhere('otp.destination = :phone', { phone })
+      .where('otp.codeHash = :tokenHash', { tokenHash })
       .andWhere('otp.purpose = :purpose', { purpose: OtpPurpose.SMS_LOGIN })
       .andWhere('otp.isUsed = false')
-      .andWhere('otp.attempts < :maxAttempts', { maxAttempts: MAX_ATTEMPTS })
       .andWhere('otp.expiresAt > NOW()')
-      .orderBy('otp.createdAt', 'DESC')
       .getOne();
 
     if (!otp) {
-      throw new UnauthorizedException('Code is invalid or expired');
-    }
-
-    const codeValid = await bcryptCompare(code, otp.codeHash);
-
-    if (codeValid === false) {
-      await this.otpRepository.increment({ id: otp.id }, 'attempts', 1);
-      throw new UnauthorizedException('Code is invalid or expired');
+      throw new UnauthorizedException('Link is invalid or expired');
     }
 
     await this.otpRepository.update({ id: otp.id }, { isUsed: true });
 
-    const user = await this.resolveUser(clinicId, phone);
+    const user = await this.resolveUser(otp.clinicId, otp.destination);
 
     return this.authService.issueTokens({
       sub: user.id,
       clinicId: user.clinicId,
       role: user.role,
     });
+  }
+
+  private buildLoginLink(clinicSlug: string, token: string): string {
+    const portalOrigin = this.configService.getOrThrow<string>('CORS_ORIGIN');
+    return `${portalOrigin}/portal/${clinicSlug}/magic?token=${token}`;
   }
 
   private async resolveUser(

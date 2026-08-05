@@ -9,13 +9,14 @@ import {
 const DEFAULT_API_VERSION = 'v21.0';
 
 /**
- * Sends plain-text messages via the Meta WhatsApp Cloud API.
+ * Sends messages via the Meta WhatsApp Cloud API — plain text by default, or
+ * an approved template when `message.whatsappTemplate` is set.
  *
  * Note: outbound free-form text only delivers within the 24h customer-service
  * window (i.e. the patient messaged the clinic's WhatsApp number recently).
- * Proactive messages outside that window (most appointment reminders) need a
- * pre-approved message template instead — ask if you hit that wall in Meta
- * Business Manager and this sender can be extended to send `type: "template"`.
+ * Proactive messages outside that window (most appointment reminders) need
+ * `whatsappTemplate` instead — see ReminderProcessorService for the caller
+ * that picks a template by the reminder's offset.
  */
 export class WhatsAppSender implements NotificationSender {
   readonly channel = NotificationChannel.WHATSAPP;
@@ -38,6 +39,7 @@ export class WhatsAppSender implements NotificationSender {
     const apiVersion =
       this.config.get<string>('WHATSAPP_API_VERSION') ?? DEFAULT_API_VERSION;
     const to = message.to.replace(/[^\d]/g, '');
+    const { whatsappTemplate } = message;
 
     const response = await fetch(
       `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
@@ -47,12 +49,33 @@ export class WhatsAppSender implements NotificationSender {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body: message.body },
-        }),
+        body: JSON.stringify(
+          whatsappTemplate
+            ? {
+                messaging_product: 'whatsapp',
+                to,
+                type: 'template',
+                template: {
+                  name: whatsappTemplate.name,
+                  language: { code: whatsappTemplate.languageCode },
+                  components: [
+                    {
+                      type: 'body',
+                      parameters: whatsappTemplate.params.map((text) => ({
+                        type: 'text',
+                        text,
+                      })),
+                    },
+                  ],
+                },
+              }
+            : {
+                messaging_product: 'whatsapp',
+                to,
+                type: 'text',
+                text: { body: message.body },
+              },
+        ),
       },
     );
 

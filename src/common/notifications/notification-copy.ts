@@ -495,6 +495,28 @@ export const appointmentReminderCopy = (
   };
 };
 
+export const magicLinkLoginCopy = (
+  locale: NotificationLocale,
+  p: { link: string },
+): NotificationCopy => {
+  if (locale === 'en') {
+    return {
+      subject: 'Log in to your patient portal',
+      body: `Tap the link to log in and view your appointments and notifications: ${p.link}`,
+    };
+  }
+  if (locale === 'ky') {
+    return {
+      subject: 'Жеке кабинетке кирүү',
+      body: `Жазылууларыңызды жана билдирүүлөрдү көрүү үчүн шилтемеге өтүңүз: ${p.link}`,
+    };
+  }
+  return {
+    subject: 'Вход в личный кабинет',
+    body: `Перейдите по ссылке, чтобы войти в личный кабинет и посмотреть записи и уведомления: ${p.link}`,
+  };
+};
+
 export const newPatientPortalMessageCopy = (
   locale: NotificationLocale,
   p: { patientName: string; preview: string },

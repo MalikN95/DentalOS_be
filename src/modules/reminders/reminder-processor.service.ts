@@ -16,10 +16,13 @@ import {
 import { AppointmentEntity } from '../../entities/appointment.entity';
 import { ClinicEntity } from '../../entities/clinic.entity';
 import { ReminderEntity, ReminderStatus } from '../../entities/reminder.entity';
+import { WhatsAppTemplatePayload } from '../notifications/notification-sender.interface';
 import { NotificationsService } from '../notifications/notifications.service';
+import { APPOINTMENT_REMINDER_TEMPLATES } from './appointment-reminder-templates';
 
 const TICK_INTERVAL_MS = 60_000;
 const BATCH_SIZE = 100;
+const MINUTE_MS = 60_000;
 
 const PHONE_CHANNELS: ReadonlySet<NotificationChannel> = new Set([
   NotificationChannel.SMS,
@@ -138,6 +141,10 @@ export class ReminderProcessorService
       await this.notificationsService.send(reminder.channel, {
         to,
         ...(await this.buildReminderCopy(appointment)),
+        whatsappTemplate:
+          reminder.channel === NotificationChannel.WHATSAPP
+            ? this.resolveWhatsAppTemplate(reminder, appointment)
+            : undefined,
       });
 
       await this.remindersRepository.update(reminder.id, {
@@ -151,6 +158,38 @@ export class ReminderProcessorService
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  // Meta rejects free-form WhatsApp text once the patient's 24h
+  // customer-service window has lapsed, which is the common case for a
+  // proactive reminder — so WhatsApp reminders use an approved template
+  // instead whenever one is configured for this reminder's offset. No match
+  // (e.g. an offset the clinic configured without a corresponding template)
+  // falls back to free text, same as before.
+  private resolveWhatsAppTemplate(
+    reminder: ReminderEntity,
+    appointment: AppointmentEntity,
+  ): WhatsAppTemplatePayload | undefined {
+    const offsetMinutes = Math.round(
+      (appointment.startsAt.getTime() - reminder.scheduledAt.getTime()) /
+        MINUTE_MS,
+    );
+    const template = APPOINTMENT_REMINDER_TEMPLATES[offsetMinutes];
+
+    if (!template) {
+      return undefined;
+    }
+
+    const time = appointment.startsAt.toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return {
+      name: template.name,
+      languageCode: template.languageCode,
+      params: [appointment.patient.firstName, time],
+    };
   }
 
   // Push fans out to every device token the patient has registered from the

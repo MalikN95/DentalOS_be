@@ -3,8 +3,8 @@ import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentClinic } from '../../common/decorators/current-clinic.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { ClinicEntity } from '../../entities/clinic.entity';
+import { MagicLinkVerifyDto } from './dto/magic-link-verify.dto';
 import { SmsRequestDto } from './dto/sms-request.dto';
-import { SmsVerifyDto } from './dto/sms-verify.dto';
 import { TokensDto } from './dto/tokens.dto';
 import { SmsAuthService } from './sms-auth.service';
 
@@ -16,21 +16,21 @@ export class SmsAuthController {
   @Public()
   @Post('request')
   @HttpCode(HttpStatus.NO_CONTENT)
-  requestCode(
+  requestLoginLink(
     @CurrentClinic() clinic: ClinicEntity,
     @Body() dto: SmsRequestDto,
   ): Promise<void> {
-    return this.smsAuthService.requestCode(clinic.id, dto.phone);
+    return this.smsAuthService.requestLoginLink(clinic, dto.phone);
   }
 
+  // Not scoped by :clinicSlug — the token alone identifies the clinic/phone
+  // it was issued for (SmsAuthService#verifyLoginLink), so the magic-link
+  // landing page only needs to send what's in its URL query string.
   @Public()
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: TokensDto })
-  verifyCode(
-    @CurrentClinic() clinic: ClinicEntity,
-    @Body() dto: SmsVerifyDto,
-  ): Promise<TokensDto> {
-    return this.smsAuthService.verifyCode(clinic.id, dto.phone, dto.code);
+  verifyLoginLink(@Body() dto: MagicLinkVerifyDto): Promise<TokensDto> {
+    return this.smsAuthService.verifyLoginLink(dto.token);
   }
 }
