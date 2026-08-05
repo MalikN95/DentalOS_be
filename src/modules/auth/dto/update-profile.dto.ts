@@ -1,6 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
+// Email is deliberately NOT here — changing it always goes through
+// POST /auth/me/email-change/request + /confirm (OTP-verified), never a
+// blind PATCH, so ownership of the new address is always proven first.
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Jane' })
   @IsOptional()

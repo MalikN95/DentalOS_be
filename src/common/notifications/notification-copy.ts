@@ -329,6 +329,28 @@ export const reviewRequestCopy = (
   };
 };
 
+export const emailChangeOtpCopy = (
+  locale: NotificationLocale,
+  p: { code: string },
+): NotificationCopy => {
+  if (locale === 'en') {
+    return {
+      subject: 'Confirm your new email',
+      body: `Your confirmation code is: ${p.code}. It expires in 5 minutes. If you didn't request this, ignore this email.`,
+    };
+  }
+  if (locale === 'ky') {
+    return {
+      subject: "Жаңы email'иңизди ырастаңыз",
+      body: `Ырастоо коду: ${p.code}. Код 5 мүнөттөн кийин жарактан чыгат. Эгер сиз бул сурам жасабасаңыз, каттты этибарга албаңыз.`,
+    };
+  }
+  return {
+    subject: 'Подтверждение нового email',
+    body: `Код подтверждения: ${p.code}. Код действителен 5 минут. Если вы не запрашивали это, проигнорируйте письмо.`,
+  };
+};
+
 interface NewReviewParams {
   patientName: string;
   doctorName?: string | null;

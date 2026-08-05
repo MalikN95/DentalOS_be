@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClinicEntity } from '../../entities/clinic.entity';
 import { OtpCodeEntity } from '../../entities/otp-code.entity';
 import { PatientEntity } from '../../entities/patient.entity';
 import { UsersModule } from '../users/users.module';
@@ -16,7 +17,7 @@ import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
     UsersModule,
     PassportModule,
     JwtModule.register({}),
-    TypeOrmModule.forFeature([OtpCodeEntity, PatientEntity]),
+    TypeOrmModule.forFeature([OtpCodeEntity, PatientEntity, ClinicEntity]),
   ],
   controllers: [AuthController, SmsAuthController],
   providers: [AuthService, JwtAccessStrategy, SmsAuthService],

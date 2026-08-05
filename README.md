@@ -129,9 +129,9 @@ All routes are protected by default (global guard); public routes are marked wit
 
 ### Self-profile (`/api/auth/me`)
 
-Any authenticated user (own account only, no `@Roles()` restriction) can read/edit their own name and photo — separate from the admin-only `PATCH /api/staff/:id` used to edit *other* staff:
+Any authenticated user (own account only, no `@Roles()` restriction) can read/edit their own name, email and photo — separate from the admin-only `PATCH /api/staff/:id` used to edit *other* staff (which is also the only place `role` can change — self-profile can't touch it):
 
-- `GET /api/auth/me` / `PATCH /api/auth/me` (`UpdateProfileDto`: `firstName?`, `lastName?`, `avatarKey?`) — both return `MeResponse` (`AuthService.getMe`/`updateProfile`), which derives `avatarUrl` from `UserEntity.avatarKey` the same way `ClinicsService` derives `logoUrl` from `logoKey`.
+- `GET /api/auth/me` / `PATCH /api/auth/me` (`UpdateProfileDto`: `firstName?`, `lastName?`, `email?`, `avatarKey?`) — both return `MeResponse` (`AuthService.getMe`/`updateProfile`), which derives `avatarUrl` from `UserEntity.avatarKey` the same way `ClinicsService` derives `logoUrl` from `logoKey`. An `email` change is checked against `UsersService.isEmailTakenByAnotherUser` (mirrors `StaffService`'s `assertEmailFree*`, enforcing the same global `UQ_users_email_non_patient` partial unique index) before being applied, returning a clean `409` instead of a raw constraint violation.
 - `POST /api/auth/me/avatar-upload` (`AvatarUploadDto: { contentType }`) — presigned S3 PUT URL, mirrors `POST /clinic/logo-upload`; key is `users/{userId}/avatar`. The frontend PUTs the file directly to S3, then persists the returned key via `PATCH /api/auth/me { avatarKey }`.
 - Login itself still only returns tokens (no profile) — the frontend calls `GET /auth/me` once per session to hydrate the real name/avatar (see `DentalOS_fe/src/hooks/useSyncProfileFromServer.ts`).
 

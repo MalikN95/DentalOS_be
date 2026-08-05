@@ -13,9 +13,11 @@ import { Public } from '../../common/decorators/public.decorator';
 import { AuthService, MeResponse } from './auth.service';
 import { AvatarUploadResponseDto } from './dto/avatar-upload-response.dto';
 import { AvatarUploadDto } from './dto/avatar-upload.dto';
+import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { TokensDto } from './dto/tokens.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
@@ -71,5 +73,27 @@ export class AuthController {
     @Body() dto: AvatarUploadDto,
   ): Promise<AvatarUploadResponseDto> {
     return this.authService.getAvatarUploadUrl(userId, dto.contentType);
+  }
+
+  @Post('me/email-change/request')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  requestEmailChange(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('clinicId') clinicId: string | null,
+    @Body() dto: RequestEmailChangeDto,
+  ): Promise<void> {
+    return this.authService.requestEmailChange(userId, clinicId, dto);
+  }
+
+  @Post('me/email-change/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  confirmEmailChange(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('clinicId') clinicId: string | null,
+    @Body() dto: ConfirmEmailChangeDto,
+  ): Promise<MeResponse> {
+    return this.authService.confirmEmailChange(userId, clinicId, dto);
   }
 }

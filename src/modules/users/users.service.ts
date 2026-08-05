@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { UserEntity } from '../../entities/user.entity';
 
@@ -87,9 +87,29 @@ export class UsersService {
     await this.usersRepository.update({ id: userId }, { refreshJti: jti });
   }
 
+  // Staff/owner/admin email is globally unique (DB partial unique index
+  // `UQ_users_email_non_patient`) — this is the app-level check that turns a
+  // conflict into a clean 409 instead of a raw constraint violation.
+  async isEmailTakenByAnotherUser(
+    userId: string,
+    email: string,
+  ): Promise<boolean> {
+    const existing = await this.usersRepository.findOne({
+      where: { email, role: Not(UserRole.PATIENT) },
+      withDeleted: true,
+    });
+
+    return Boolean(existing && existing.id !== userId);
+  }
+
   async updateProfile(
     userId: string,
-    patch: { firstName?: string; lastName?: string; avatarKey?: string },
+    patch: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      avatarKey?: string;
+    },
   ): Promise<UserEntity> {
     // Only apply provided fields — an omitted field must stay untouched, not
     // get wiped by a blind save of an entity with undefined columns.
