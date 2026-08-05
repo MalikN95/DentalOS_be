@@ -11,5 +11,5 @@ export const dataSource = new DataSource({
   database: process.env.POSTGRES_DB,
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
-  synchronize: true,
+  synchronize: process.env.DB_SYNC === 'true',
 });
