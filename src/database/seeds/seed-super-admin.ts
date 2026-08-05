@@ -6,7 +6,9 @@ import { getSeedConfig } from './seed.config';
 
 const BCRYPT_ROUNDS = 12;
 
-export const seedSuperAdminUser = async (dataSource: DataSource): Promise<void> => {
+export const seedSuperAdminUser = async (
+  dataSource: DataSource,
+): Promise<void> => {
   const config = getSeedConfig();
   const userRepository = dataSource.getRepository(UserEntity);
 
@@ -16,7 +18,10 @@ export const seedSuperAdminUser = async (dataSource: DataSource): Promise<void> 
     where: { email: config.superAdminEmail },
   });
 
-  const passwordHash = await bcryptHash(config.superAdminPassword, BCRYPT_ROUNDS);
+  const passwordHash = await bcryptHash(
+    config.superAdminPassword,
+    BCRYPT_ROUNDS,
+  );
 
   if (existingUser) {
     existingUser.passwordHash = passwordHash;

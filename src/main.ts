@@ -10,7 +10,10 @@ const bootstrap = async (): Promise<void> => {
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors({
+    origin: config.getOrThrow<string>('CORS_ORIGIN'),
+    credentials: true,
+  });
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({

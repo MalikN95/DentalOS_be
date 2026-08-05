@@ -18,6 +18,8 @@ export const getSeedConfig = (): SeedConfig => ({
   adminFirstName: process.env.SEED_ADMIN_FIRST_NAME ?? 'Admin',
   adminLastName: process.env.SEED_ADMIN_LAST_NAME ?? 'User',
   staffPassword: process.env.SEED_STAFF_PASSWORD ?? 'Staff12345',
-  superAdminEmail: process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@dentalos.local',
-  superAdminPassword: process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'SuperAdmin12345',
+  superAdminEmail:
+    process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@dentalos.local',
+  superAdminPassword:
+    process.env.SEED_SUPER_ADMIN_PASSWORD ?? 'SuperAdmin12345',
 });
