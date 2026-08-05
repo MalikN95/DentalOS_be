@@ -12,7 +12,7 @@ export const buildTypeOrmOptions = (
   database: config.getOrThrow<string>('POSTGRES_DB'),
   autoLoadEntities: true,
   // Schema is managed via migrations only, never synchronize in any environment
-  synchronize: false,
+  synchronize: true,
   migrations: ['dist/database/migrations/*.js'],
   migrationsRun: config.get<string>('NODE_ENV') === 'production',
 });
